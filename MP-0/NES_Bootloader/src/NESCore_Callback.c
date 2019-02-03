@@ -7,9 +7,9 @@
  *****************************************************************************/
 
 /*****************************************************************************
- * NESCore_Callback.c - Implements the NESCore emulator callback functions, 
+ * NESCore_Callback.c - Implements the NESCore emulator callback functions,
  * e.g. for polling controller input, displaying out, playing sound. Implement
- * the main emulation interfacing here. 
+ * the main emulation interfacing here.
  *
  *
  * NOTES:
@@ -42,7 +42,7 @@ void NESCore_Callback_OutputFrame(word *WorkFrame) {
 		}
 
 	}
-  
+
 	// Flush the cache since VDMA does not play nicely with the cache
     Xil_DCacheFlush();
 
@@ -50,14 +50,91 @@ void NESCore_Callback_OutputFrame(word *WorkFrame) {
 }
 
 
-// Main input callback. Overwite the passed-by references pad1 and pad2 
+// Main input callback. Overwite the passed-by references pad1 and pad2
 // values, presumably using the buttons and switches on your ZedBoard.
 void NESCore_Callback_InputPadState(dword *pdwPad1, dword *pdwPad2) {
 
-	// Currently hard-coded so that player 1 is pressing A and B, and player 2 is pressing nothing.
-	*pdwPad1 = NCTL_A | NCTL_B;
-	*pdwPad2 = 0;
+	/********Variable Setup********/
 
+	// Defaults both players to a "no input" state.
+	// Ensures no input values are carried over from last callback.
+	*pdwPad1 = 0x0;
+	*pdwPad2 = 0x0; // No second input method & therefore player 2 doesn't exist.
+
+	/**
+	 * Bitmask references from NESCore_Callback.h
+	 *
+	 * NCTL_A      0x01
+	 * NCTL_B      0x02
+	 * NCTL_SELECT 0x04
+	 * NCTL_START  0x08
+	 * NCTL_UP     0x10
+	 * NCTL_DOWN   0x20
+	 * NCTL_LEFT   0x40
+	 * NCTL_RIGHT  0x80
+	 */
+
+
+	#define SW 0x4121_0000
+	#define BTN 0x4120_0000
+
+	uint32_t *sw_ptr = SW;
+	uint32_t *btn_ptr = BTN;
+
+	/********I/O Detection********/
+
+	// Checks for a active "A" button.
+	if(*sw_ptr & 0x01)
+	{
+		// If active, add the "A" bits into player 1's input.
+		*pdwPad1 |= NCTL_A;
+	}
+    // Checks for a active "B" sbutton.
+    if(*sw_ptr & 0x02)
+    {
+    	// If active, add the "B" bits into player 1's input.
+    	*pdwPad1 |= NCTL_B;
+	}
+	// Checks for a active "SELECT" switch.
+    if(*sw_ptr & 0x04)
+    {
+    	// If active, add the "SELECT" bits into player 1's input.
+    	*pdwPad1 |= NCTL_SELECT;
+	}
+	// Checks for a active "START" switch.
+    if(*sw_ptr & 0x08)
+    {
+    	// If active, add the "START" bits into player 1's input.
+    	*pdwPad1 |= NCTL_START;
+	}
+	// Checks for a active "UP" button.
+    if(*btn_ptr & 0x10)
+    {
+    	// If active, add the "UP" bits into player 1's input.
+    	*pdwPad1 |= NCTL_UP;
+    }
+	// Checks for a active "DOWN" button.
+    if(*btn_ptr & 0x20)
+    {
+    	// If active, add the "DOWN" bits into player 1's input.
+		*pdwPad1 |= NCTL_DOWN;
+	}
+	// Checks for a active "LEFT" button.
+    if(*btn_ptr & 0x40)
+    {
+    	// If active, add the "LEFT" bits into player 1's input.
+		*pdwPad1 |= NCTL_LEFT;
+	}
+	// Checks for a active "RIGHT" button.
+    if(*btn_ptr & 0x80)
+    {
+    	// If active, add the "RIGHT" bits into player 1's input.
+		*pdwPad1 |= NCTL_RIGHT;
+	}
+
+	/********Method Cleanup********/
+
+    // End of Method.
 	return;
 }
 
@@ -86,11 +163,11 @@ void NESCore_Callback_CloseSound(void) {
 // Main sound playback function. It is possible that this code should just
 // write to a software FIFO, with a new interrupt handler to stream in the
 // appropriate burst of samples. It would seem likely that the interrupt
-// handler would slow down the NES emulation, but otherwise we have to put a 
+// handler would slow down the NES emulation, but otherwise we have to put a
 // "wait" statement which would also bog it down. Audio should not get laggy
 // unless there is some bug in the NESCore in terms of how it generates frames
-void NESCore_Callback_OutputSample(int nSamples, byte *channel1, 
-				   byte *channel2, byte *channel3, 
+void NESCore_Callback_OutputSample(int nSamples, byte *channel1,
+				   byte *channel2, byte *channel3,
 				   byte *channel4, byte *channel5) {
 
   return;
@@ -111,12 +188,12 @@ inline void play_next_squeue() {
 // if we build a custom nes-specific display controller.
 
 word NesPalette[64] = {
-  1, 2, 3, 4, 5, 6, 7, 8, 9, 
+  1, 2, 3, 4, 5, 6, 7, 8, 9,
   10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
   20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
   30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
-  40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 
-  50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 
+  40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
+  50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
   60, 61, 62, 63, 64};
 
 
