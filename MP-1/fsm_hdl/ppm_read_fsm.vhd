@@ -7,7 +7,8 @@ entity ppm_read is
 port ( X, CLK : in std_logic;
 	ppm_read_reset : in std_logic;
 	channel_count, count_enable : out std_logic;
-	cycle_count : out std_logic(31 downto 0);
+	cycle_count : out std_logic_vector(31 downto 0);
+	channel_number : out std_logic_vector(2 downto 0);
 end ppm_read;
 
 -- entity register32bit is 
@@ -50,7 +51,7 @@ end state_reset_counter;
 
 architecture reset_counter of state_reset_counter is
 begin
-    process(clk, reset)
+    process(clk, reset, inc)
     begin
 		channel_reset <= '1';
 		sel <= reset&inc;
@@ -82,6 +83,7 @@ architecture ppm_read of ppm_read is
 	begin
     channel_tracker : state_reset_counter port map(channel_count, chan_reset_loop, CLK, chan_reset_loop, count_temp);
 	ppm_read_reset <= chan_reset_loop;
+	channel_number <= count_temp;
 	
 	sync_proc: process(CLK, NS, ppm_read_reset)
 		begin
