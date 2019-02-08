@@ -4,9 +4,9 @@ use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;  
 -- entity
 entity ppm_read is
-port ( X, CLK : in std_logic;
+port ( ppm_input, CLK : in std_logic;
 	ppm_read_reset : in std_logic;
-	channel_count, count_enable : out std_logic;
+	count_enable : out std_logic;
 	cycle_count : out std_logic_vector(31 downto 0);
 	channel_number : out std_logic_vector(2 downto 0);
 end ppm_read;
@@ -79,6 +79,7 @@ architecture ppm_read of ppm_read is
 	signal PS, NS : state_type;
 	signal count_temp : std_logic_vector(2 downto 0);
 	signal chan_reset_loop : std_logic;
+	signal channel_count : std_logic;
 	
 	begin
     channel_tracker : state_reset_counter port map(channel_count, chan_reset_loop, CLK, chan_reset_loop, count_temp);
@@ -91,24 +92,24 @@ architecture ppm_read of ppm_read is
 		elsif (rising_edge(CLK)) then PS <= NS;
 		end if;
 	end process sync_proc;
-	comb_proc: process(PS, X)
+	comb_proc: process(PS, ppm_input)
 		begin
 		count_enable <= '0';
 		case PS is
 			when a =>
 				count_enable <= '0';
-				if (X='0') then NS<=b; channel_count <= '0';
+				if (ppm_input='0') then NS<=b; channel_count <= '0';
 				else NS <= a; channel_count <= '0';
 				end if;
 			when b =>
 				count_enable <= '0'; 
 				cycle_count <= x"00000000";
-				if (X='0') then NS<=b; channel_count <= '0';
+				if (ppm_input='0') then NS<=b; channel_count <= '0';
 				else NS <= c; channel_count <= '1';
 				end if;
 			when c =>
 				count_enable <= '1';
-				if (X='0') then NS<=b; channel_count <= '0';
+				if (ppm_input='0') then NS<=b; channel_count <= '0';
 				else NS <= c;  channel_count <= '0';
 				end if;
 			when others =>
