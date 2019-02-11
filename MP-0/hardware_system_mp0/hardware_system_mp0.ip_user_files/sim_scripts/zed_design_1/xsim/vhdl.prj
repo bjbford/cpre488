@@ -1,8 +1,0 @@
-vhdl xil_defaultlib  \
-"../../../bd/zed_design_1/ip/zed_design_1_axi_gpio_0_0/sim/zed_design_1_axi_gpio_0_0.vhd" \
-"../../../bd/zed_design_1/ip/zed_design_1_axi_gpio_1_0/sim/zed_design_1_axi_gpio_1_0.vhd" \
-"../../../bd/zed_design_1/ip/zed_design_1_axi_gpio_1_1/sim/zed_design_1_axi_gpio_1_1.vhd" \
-"../../../bd/zed_design_1/ip/zed_design_1_rst_ps7_0_100M_0/sim/zed_design_1_rst_ps7_0_100M_0.vhd" \
-"../../../bd/zed_design_1/sim/zed_design_1.vhd" \
-
-nosort

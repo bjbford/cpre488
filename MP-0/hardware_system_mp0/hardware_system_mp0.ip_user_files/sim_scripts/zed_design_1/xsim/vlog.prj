@@ -1,8 +1,0 @@
-verilog xil_defaultlib --include "../../../../hardware_system_mp0.srcs/sources_1/bd/zed_design_1/ipshared/ec67/hdl" --include "../../../../hardware_system_mp0.srcs/sources_1/bd/zed_design_1/ipshared/70cf/hdl" --include "../../../../hardware_system_mp0.srcs/sources_1/bd/zed_design_1/ip/zed_design_1_processing_system7_0_0" \
-"../../../bd/zed_design_1/ip/zed_design_1_processing_system7_0_0/sim/zed_design_1_processing_system7_0_0.v" \
-"../../../bd/zed_design_1/ip/zed_design_1_xbar_0/sim/zed_design_1_xbar_0.v" \
-"../../../bd/zed_design_1/ip/zed_design_1_auto_pc_0/sim/zed_design_1_auto_pc_0.v" \
-
-verilog xil_defaultlib "glbl.v"
-
-nosort
