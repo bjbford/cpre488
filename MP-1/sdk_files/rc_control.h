@@ -55,6 +55,20 @@ enum Debug debug_mode = NONE;
 enum Software_Record {NONE, RECORD};
 enum Software_Record record_mode = NONE;
 
+// Replay mode for axi_ppm module.
+// NONE     - No PPM replay.
+// REPLAY   - BTN_RIGHT transmits any stored PPM values over axi_ppm.
+// 			  BTN_LEFT decrements the current play index.
+enum Software_Replay {NONE, REPLAY};
+enum Software_Replay replay_mode = NONE;
+
+// Filter mode for the axi_ppm module.
+// NONE     - No value verification.
+// FILTER   - Verifies all values being sent to the drone to ensure
+//			  those values do not place the craft in an unstable position.
+enum Software_Filter {NONE, FILTER};
+enum Software_Filter filter_mode = NONE;
+
 // User given command to exit the program.
 // True = Yes
 // False = No
@@ -66,14 +80,21 @@ int record[50]; // RANDOM SIZE
 // Holds the current index of the PPM recording array.
 int recording_index = 0;
 
+// Holds the current index of the PPM replay array.
+int replay_index = 0;
+
 
 // Main pulling loop of program.
 void UAVInterfacing_Run();
 // Checks register values and sets corresponding modes.
 void check_registers();
 // Controls how the PPM_Output is generated.
-void run_relay_mode();
+void relay_mode_handler();
 // Sends PPM Channel values via UART for debugging.
-void run_debug_mode();
+void debug_mode_handler();
 // Records & rewinds the current PPM capture.
-void run_record_mode();
+void record_mode_handler();
+// Replays the PPM Frame values to the axi_ppm.
+void replay_mode_handler();
+// Verifies all values being sent to the drone.
+void filter_mode_handler();
