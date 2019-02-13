@@ -55,21 +55,22 @@ end ppm_capture;
 
 -- architecture
 architecture ppm_capture of ppm_capture is
-	type state_type is (a, b, c);
+	type state_type is (idle, gap, channel);
 	-- should we initialize unknowns here (instead of on hard reset)
 	signal PS, NS : state_type;
-	signal state_resetn : std_logic;
-	signal count_en_sig, channel_count_sig : std_logic;
-	signal write_addr_sig : std_logic_vector(2 downto 0);
-	signal cycle_count_sig : std_logic_vector(31 downto 0);
+	signal state_resetn : std_logic := '1';
+	signal count_en_sig, channel_count_sig, end_of_frame_sig : std_logic := '0';
+	signal write_addr_sig : std_logic_vector(2 downto 0) := "000";
+	signal cycle_count_sig : std_logic_vector(31 downto 0) := x"00000000";
 	
 	begin
 	cycle_count <= cycle_count_sig;
 	write_addr <= write_addr_sig;
+	end_of_frame <= end_of_frame_sig;
 	
 	sync_proc: process(CLK)
 		begin
-		if (ppm_cap_resetn = '0')then	PS <= a;
+		if (ppm_cap_resetn = '0')then	PS <= idle;
 		elsif (rising_edge(CLK)) then PS <= NS;
 		end if;
 	end process sync_proc;
@@ -77,32 +78,38 @@ architecture ppm_capture of ppm_capture is
 	comb_proc: process(PS, ppm_input, state_resetn)
 		begin
 		--default value assignments
-		NS <= a;
+		NS <= idle;
 		channel_count_sig <= '0';
 		count_en_sig <= '0';
 		write_en <= '0';
 		case PS is
-			when a =>
+			--idle state
+			when idle =>
 				count_en_sig <= '0';
-				if (ppm_input='0') then NS<=b; channel_count_sig <= '0'; write_en <= '0';
-				else NS <= a; channel_count_sig <= '0'; write_en <= '0';
+				if (ppm_input='0') then NS<=gap; channel_count_sig <= '0'; write_en <= '0';
+				else NS <= idle; channel_count_sig <= '0'; write_en <= '0';
 				end if;
-			when b =>
+			--gap state
+			when gap =>
 				count_en_sig <= '0'; 
-				if (ppm_input='0') then NS<=b; channel_count_sig <= '0'; write_en <= '0';
-				else NS <= c; channel_count_sig <= '1'; write_en <= '0';
+				if (ppm_input='0') then NS<=gap; channel_count_sig <= '0'; write_en <= '0';
+				else NS <= channel; channel_count_sig <= '1'; write_en <= '0';
 				end if;
-			when c =>
+			--channel state
+			when channel =>
 				count_en_sig <= '1';
-				if (ppm_input='0') then NS<=b; channel_count_sig <= '0'; write_en <= '1';
-				elsif (state_resetn = '0') then NS <= a; channel_count_sig <= '0'; write_en <= '0';
-				else NS <= c;  channel_count_sig <= '0'; write_en <= '0';
+				if (ppm_input='0') then NS<=gap; channel_count_sig <= '0'; write_en <= '1';
+				elsif (state_resetn = '0') then NS <= idle; channel_count_sig <= '0'; write_en <= '0';
+				else NS <= channel;  channel_count_sig <= '0'; write_en <= '0';
 				end if;
 			when others =>
-				channel_count_sig <= '0'; count_en_sig <= '0'; write_en <= '0'; NS <= a;
+				channel_count_sig <= '0'; count_en_sig <= '0'; write_en <= '0'; NS <= idle;
 		end case;
 	end process comb_proc;
 	
+	--clock process
+	--counting cycles of high input
+	--MIGHT NEED TO ADD 1, MOST LIKELY DOESN'T MATTER
 	cycle_proc: process(CLK)
 		begin
 		if(rising_edge(CLK)) then
@@ -112,18 +119,20 @@ architecture ppm_capture of ppm_capture is
 		end if;
 	end process cycle_proc;
 	
+	--clock process
+	--counting channels - counts when channel_count_sig goes high between state channel and gap
 	channel_proc: process(CLK)
 		begin
 		if(rising_edge(CLK)) then
 			if(ppm_cap_resetn = '0') then
-				write_addr_sig <= (others => '0'); end_of_frame <= '0';	state_resetn <= '1'; 
+				write_addr_sig <= (others => '0'); end_of_frame_sig <= '0';	state_resetn <= '1'; 
 			else
 				if(write_addr_sig = "111") then
 					write_addr_sig <= (others => '0');
-					end_of_frame <= '1';
+					end_of_frame_sig <= '1';
 					state_resetn <= '0';
-				elsif(channel_count_sig = '1') then write_addr_sig <= std_logic_vector(unsigned(write_addr_sig) + 1); end_of_frame <= '0'; state_resetn <= '1';
-				else end_of_frame <= '0'; state_resetn <= '1';
+				elsif(channel_count_sig = '1') then write_addr_sig <= std_logic_vector(unsigned(write_addr_sig) + 1); end_of_frame_sig <= '0'; state_resetn <= '1';
+				else end_of_frame_sig <= '0'; state_resetn <= '1';
 				end if;
 			end if;
 		end if;
