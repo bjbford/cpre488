@@ -30,6 +30,9 @@
 #define BTN_RIGHT  0x08
 #define BTN_UP     0x10  // Unconfirmed
 
+// Used in the record array to store PPM frames w/ their channel values.
+#define MAX_FRAMES_TO_RECORD 50
+
 // Register address for the switch and button gpio ports.
 uint32_t *sw_ptr = XPAR_SWS_8BITS_BASEADDR;
 uint32_t *btn_ptr = XPAR_BTNS_5BITS_BASEADDR;
@@ -77,11 +80,13 @@ bool exit_flag = false;
 // PPM Frame recoding array.
 // I = Specific PPM Frame
 // J = Channels in each PPM frame.
-//         I   J
-int record[50][6];
+//                   I           J
+int record[MAX_FRAMES_TO_RECORD][6];
 
-// Holds the current index of the PPM recording array.
-int recording_index = 0;
+// Refers to the above record array.
+// This index corresponds to the I or row value to keep track of the
+// current recorded PPM Frame.
+int frame_index = 0;
 
 // Holds the current index of the PPM replay array.
 int replay_index = 0;

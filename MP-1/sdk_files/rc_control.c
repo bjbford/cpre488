@@ -166,8 +166,9 @@ void relay_mode_handler()
 	// HARDWARE Relay Mode active.
 	if(relay_mode == HARDWARE)
 	{
-		// Pass PPM_Input directly to PPM_Output.
-		// slave_register[0] = 0;
+		// Set config register 0 to tell axi_ppm that hardware relay mode
+		// has been enabled. PPM_Input routes directly to PPM_Output.
+		slave_register[0] = 0;
 	}
 	// SOFTWARE Relay Mode active.
 	else if(relay_mode == SOFTWARE)
@@ -175,14 +176,23 @@ void relay_mode_handler()
 		// Signals the coping of PPM frames from slave registers 10 -> 15
 		// into slave registers 20 -> 25. 20 thru 25 registers are
 		// then read by axi_ppm module to generate output.
-		int i;
-		for(i = 10; i <= 15; i++)
-		{
-			// slave_register[i+10] = slave_register[i];
-		}
 
-		// or
-		// slave_register[0] = 1;
+		// Channel 1
+		slave_register[#] = slave_register[#];
+		// Channel 2
+		slave_register[#] = slave_register[#];
+		// Channel 3
+		slave_register[#] = slave_register[#];
+		// Channel 4
+		slave_register[#] = slave_register[#];
+		// Channel 5
+		slave_register[#] = slave_register[#];
+		// Channel 6
+		slave_register[#] = slave_register[#];
+
+		// Set config register 1 to tell axi_ppm that software relay mode
+		// has been enabled. PPM_Output is generated from the copied values.
+		slave_register[0] = 1;
 	}
 }
 
@@ -197,14 +207,13 @@ void debug_mode_handler()
 	if(debug_mode == SOFTWARE)
 	{
 		// Output PPM Channel values via UART.
-		// Current PPM CHannel values are stored in slave registers 10 thru 15.
-		int i;
-		int channel_sel = 1;
-		for(i = 10; i <= 15; i++)
-		{
-			xil_printf("Channel %d: %d", channel_sel, slave_register[i]);
-			channel_sel++;
-		}
+		// Current PPM Channel values are stored in slave registers # thru #.
+		xil_printf("Channel 1: %d \r\n", slave_register[#]);
+		xil_printf("Channel 2: %d \r\n", slave_register[#]);
+		xil_printf("Channel 3: %d \r\n", slave_register[#]);
+		xil_printf("Channel 4: %d \r\n", slave_register[#]);
+		xil_printf("Channel 5: %d \r\n", slave_register[#]);
+		xil_printf("Channel 6: %d \r\n", slave_register[#]);
 	}
 }
 
@@ -218,16 +227,54 @@ void record_mode_handler()
 	// Software Record Mode active.
 	if(record_mode == RECORD)
 	{
-		// Stores next PPM in array and increments index.
+		// Stores next PPM Frame w/ channel vaues in array and increments Frame index.
 		if(*btn_ptr & BTN_DOWN)
 		{
-			// record[recording_index] = next PPM Frame;
-			recording_index++;
+			// Array boundary detection. Checks if next move will cause out-of-bounds error.
+			if(!((frame_index + 1) > MAX_FRAMES_TO_RECORD))
+			{
+				// Array inbounds. Store values and increments.
+				// Channel 1 Value
+				record[frame_index][0] = slave_register[#];
+				// Channel 2 Value
+				record[frame_index][1] = slave_register[#];
+				// Channel 3 Value
+				record[frame_index][2] = slave_register[#];
+				// Channel 4 Value
+				record[frame_index][3] = slave_register[#];
+				// Channel 5 Value
+				record[frame_index][4] = slave_register[#];
+				// Channel 6 Value
+				record[frame_index][5] = slave_register[#];
+
+				// Increments the frame index.
+				frame_index++;
+			}
 		}
 		// Rewinds the recording by decrementing array index.
 		else if(*btn_ptr & BTN_UP)
 		{
-			recording_index--;
+			// Array boundary detection. Checks if next move will cause out-of-bounds error.
+			if(!((frame_index - 1) < 0))
+			{
+				// Array will be inbounds. Clear current Frame data and decrement.
+				// Channel 1 Value
+				record[frame_index][0] = 0;
+				// Channel 2 Value
+				record[frame_index][1] = 0;
+				// Channel 3 Value
+				record[frame_index][2] = 0;
+				// Channel 4 Value
+				record[frame_index][3] = 0;
+				// Channel 5 Value
+				record[frame_index][4] = 0;
+				// Channel 6 Value
+				record[frame_index][5] = 0;
+
+				// Moves left one column in the 2D array.
+				frame_index--;
+
+			}
 		}
 	}
 }
@@ -246,15 +293,13 @@ void replay_mode_handler()
 		if(*btn_ptr & BTN_RIGHT)
 		{
 			// Output PPM Channel values to axi_ppm.
-			int i;
-			for(i = #; i <= #; i++)
-			{
-				// axi_ppm = slave_register[i];
-			}
+			// TO BE COMPLETED.
+			// axi_ppm = slave_register[#];
 		}
 		// Decrement the current play index.
 		else if(*btn_ptr & BTN_LEFT)
 		{
+			// TO BE COMPLETED.
 			replay_index--;
 		}
 	}
