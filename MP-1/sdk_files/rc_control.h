@@ -72,10 +72,13 @@ enum Software_Filter filter_mode = NONE;
 // User given command to exit the program.
 // True = Yes
 // False = No
-bool exit_status = false;
+bool exit_flag = false;
 
 // PPM Frame recoding array.
-int record[50]; // RANDOM SIZE
+// I = Specific PPM Frame
+// J = Channels in each PPM frame.
+//         I   J
+int record[50][6];
 
 // Holds the current index of the PPM recording array.
 int recording_index = 0;
