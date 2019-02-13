@@ -1,0 +1,9 @@
+add wave -position insertpoint sim:/ppm_gen/*
+force -freeze sim:/ppm_gen/CLK 1 0, 0 {25 ns} -r 50
+force -freeze sim:/ppm_gen/gen_en 0 0
+force -freeze sim:/ppm_gen/ppm_gen_resetn 0 0
+force -freeze sim:/ppm_gen/inc_cycle_count 0 0
+run
+force -freeze sim:/ppm_gen/gen_en 1 0
+force -freeze sim:/ppm_gen/ppm_gen_resetn 1 0
+force -freeze sim:/ppm_gen/inc_cycle_count 8 0
