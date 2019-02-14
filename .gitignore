@@ -1,3 +1,4 @@
 *.log
 webtalk
 cpre488_git.code-workspace
+MP-1/.vscode/c_cpp_properties.json
