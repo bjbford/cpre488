@@ -245,17 +245,17 @@ void record_mode_handler()
 		{
 			// Store values.
 			// Channel 1 Value
-			record[frame_index][0] = slave_register[#];
+			record[frame_index][0] = slave_register[2];
 			// Channel 2 Value
-			record[frame_index][1] = slave_register[#];
+			record[frame_index][1] = slave_register[3];
 			// Channel 3 Value
-			record[frame_index][2] = slave_register[#];
+			record[frame_index][2] = slave_register[4];
 			// Channel 4 Value
-			record[frame_index][3] = slave_register[#];
+			record[frame_index][3] = slave_register[5];
 			// Channel 5 Value
-			record[frame_index][4] = slave_register[#];
+			record[frame_index][4] = slave_register[6];
 			// Channel 6 Value
-			record[frame_index][5] = slave_register[#];
+			record[frame_index][5] = slave_register[7];
 
 			// Array boundary detection. Checks if next move will cause out-of-bounds error.
 			if(!((frame_index + 1) > MAX_FRAMES_TO_RECORD))
