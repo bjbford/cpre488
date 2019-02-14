@@ -93,7 +93,9 @@ int replay_index = 0;
 
 
 // Main pulling loop of program.
-void UAVInterfacing_Run();
+void main();
+// Initializes various system components.
+void initialize_system();
 // Checks register values and sets corresponding modes.
 void check_registers();
 // Controls how the PPM_Output is generated.
@@ -106,3 +108,5 @@ void record_mode_handler();
 void replay_mode_handler();
 // Verifies all values being sent to the drone.
 void filter_mode_handler();
+// Checks min and max values of each PPM channel.
+void channel_boundary_correction()
