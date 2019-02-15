@@ -1,61 +1,20 @@
-
-
--- library IEEE;
--- use IEEE.std_logic_1164.all;
--- use IEEE.numeric_std.all;  
-
--- entity cycle_decrementer is 
--- port(resetn, clk, enable, load : in std_logic;
-	-- start_val : in std_logic_vector (31 downto 0);
-	-- count : out std_logic_vector (31 downto 0)
--- );
--- end cycle_decrementer;
-
--- architecture decrementer of cycle_decrementer is
--- signal sel: std_logic_vector(1 downto 0);
--- signal count_sig : std_logic_vector(31 downto 0);
--- begin
-    -- process(clk, resetn, enable, load)
-    -- begin
-		-- sel <= resetn&enable;
-		-- count <= count_sig;
-		-- if(rising_edge(clk)) then
-			-- if(load = '1') then count <= start_val;
-			-- else
-				-- case sel is
-					-- when "00" | "01" =>
-						-- --reset to clock cycles in gap
-						-- count_sig <= x"FFFFFFFF";
-					-- when "11" =>
-						-- if(count_sig = x"00000000") then count_sig <= x"00000000";
-						-- else count_sig <= std_logic_vector(unsigned(count_sig) - 1);
-						-- end if;
-					-- when "10" =>
-						-- count_sig <= count_sig;
-					-- when others =>
-						-- count_sig <= x"00000000";
-				-- end case;
-			-- end if;
-		-- end if;
-    -- end process;
--- end decrementer;
-
 -- library declaration
 library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
 
 -- entity
-entity ppm_gen is
+entity ppm_gen_fsm is
 port (CLK, gen_en : in std_logic;
 	ppm_gen_resetn : in std_logic;
 	inc_cycle_count : in std_logic_vector(31 downto 0);
 	read_addr : out std_logic_vector(2 downto 0);
+	read_en    : out std_logic;
 	ppm_output : out std_logic);
-end ppm_gen;
+end ppm_gen_fsm;
 
 -- architecture
-architecture ppm_gen of ppm_gen is
+architecture ppm_gen_fsm of ppm_gen_fsm is
 	type state_type is (idle, gap, chan);
 	signal PS, NS : state_type;
 	signal gen_resetn_sig, decrement_en, decrement_resetn, gap_en, gap_resetn, channel_count_en, frame_start : std_logic;
@@ -65,21 +24,25 @@ architecture ppm_gen of ppm_gen is
 	signal gap_val : unsigned(15 downto 0) := x"9C40";
 	signal decrement_val : unsigned(31 downto 0) := x"FFFFFFFF";
 	signal frame_val : unsigned(31 downto 0) := x"001E8480";
+	signal read_en_sig : std_logic := '0';
 
 	begin
 	gen_resetn_sig <= ppm_gen_resetn;
 	read_addr <= addr_sig;
+	read_en <= read_en_sig;
 	frame_start <= gen_en and (not frame_running);
 	
-	sync_proc: process(CLK, NS, ppm_gen_resetn, gen_resetn_sig)
+	sync_proc: process(CLK)
 		begin
-		--block should receive reset when channel is idle
-		if (gen_resetn_sig = '0') then PS <= idle;
-		elsif (rising_edge(CLK)) then PS <= NS;
+		if(rising_edge(CLK)) then 
+		    --block should receive reset when channel is idle
+            if (gen_resetn_sig = '0') then PS <= idle;
+            else PS <= NS;
+            end if;
 		end if;
 	end process sync_proc;
 	
-	comb_proc: process(PS, gen_en, gap_done, channel_done, frame_done)
+	comb_proc: process(PS, gen_en, gap_done, channel_done, frame_done, addr_sig)
 		begin
 		ppm_output <= '0';
 		decrement_en <= '0';
@@ -87,6 +50,7 @@ architecture ppm_gen of ppm_gen is
 		gap_en <= '0';
 		gap_resetn <= '1';
 		channel_count_en <= '0';
+		NS <= PS;
 		case PS is
 			--idle (no enable)
 			when idle =>
@@ -94,7 +58,7 @@ architecture ppm_gen of ppm_gen is
 				decrement_en <= '0';
 				gap_en <= '0';
 				gap_resetn <= '0'; 
-				decrement_resetn <= '0';
+				decrement_resetn <= '1';
 				if (gen_en = '0') then NS<=idle; channel_count_en <= '0';
 				elsif (frame_done = '1') then  NS <= gap; channel_count_en <= '0'; 
 				end if;
@@ -165,12 +129,12 @@ architecture ppm_gen of ppm_gen is
 	begin
 		if(rising_edge(CLK)) then
 			if(ppm_gen_resetn = '0') then
-				channel_done <= '0';
+				channel_done <= '0'; read_en_sig <= '0';
 			else
-				if(decrement_resetn = '0') then decrement_val <= unsigned(inc_cycle_count); channel_done <= '0';
-				elsif(decrement_val = x"00000000") then channel_done <= '1';
-				elsif(decrement_en = '1') then decrement_val <= decrement_val - 1;
-				else channel_done <= '0';
+				if(decrement_resetn = '0') then decrement_val <= unsigned(inc_cycle_count); channel_done <= '0'; read_en_sig <= '1';
+				elsif(decrement_val = x"00000000") then channel_done <= '1'; read_en_sig <= '0';
+				elsif(decrement_en = '1') then decrement_val <= decrement_val - 1; read_en_sig <= '0';
+				else channel_done <= '0'; read_en_sig <= '0';
 				end if;
 			end if;
 		end if;
@@ -188,9 +152,8 @@ architecture ppm_gen of ppm_gen is
 			--otherwise, keep counting
 			if(frame_val = x"00000000") then frame_done <= '1'; frame_running <= '0';
 			elsif(frame_running = '1') then frame_val <= frame_val - 1;
-			else frame_running <= '0'; frame_val <= x"001E8480"; frame_done <= '0';
 			end if;
 		end if;
 	end process period_proc;
 	
-end ppm_gen;
+end ppm_gen_fsm;

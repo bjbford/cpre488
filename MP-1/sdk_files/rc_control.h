@@ -33,44 +33,61 @@
 // Used in the record array to store PPM frames w/ their channel values.
 #define MAX_FRAMES_TO_RECORD 50
 
+#define register_offset 0x4
+// Slave register macros.
+uint32_t *slv_reg0 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR;
+uint32_t * slv_reg1 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset;
+uint32_t * slv_reg2 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 2;
+uint32_t * slv_reg3 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 3;
+uint32_t * slv_reg4 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 4;
+uint32_t * slv_reg5 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 5;
+uint32_t * slv_reg6 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 6;
+uint32_t * slv_reg7 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 7;
+uint32_t * slv_reg8 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 8;
+uint32_t * slv_reg9 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 9;
+uint32_t * slv_reg10 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 10;
+uint32_t * slv_reg11 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 11;
+uint32_t * slv_reg12 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 12;
+uint32_t * slv_reg13 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 13;
+
 // Register address for the switch and button gpio ports.
 uint32_t *sw_ptr = XPAR_SWS_8BITS_BASEADDR;
 uint32_t *btn_ptr = XPAR_BTNS_5BITS_BASEADDR;
 
 // Relay mode for axi_ppm module.
-// HARDWARE - axi_ppm directly passes PPM_Input to PPM_Output.
-// SOFTWARE - CPU reads in 6 frames into tempoary registers
+// RELAY_HARDWARE - axi_ppm directly passes PPM_Input to PPM_Output.
+// RELAY_SOFTWARE - CPU reads in 6 frames into tempoary registers
 //            that the FSM will use to generate the output.
-enum Relay {HARDWARE, SOFTWARE};
-enum Relay relay_mode = HARDWARE;
+enum Relay {RELAY_HARDWARE, RELAY_SOFTWARE};
+enum Relay relay_mode = RELAY_HARDWARE;
 
 // Debug mode for axi_ppm module.
-// NONE     - No UART output.
-// SOFTWARE - Prints (via UART) values of PPM channels stored
+// DEBUG_NONE     - No UART output.
+// DEBUG_SOFTWARE - Prints (via UART) values of PPM channels stored
 //			  in slave registers from the axi_ppm module.
-enum Debug {NONE, SOFTWARE};
-enum Debug debug_mode = NONE;
+enum Debug {DEBUG_NONE, DEBUG_SOFTWARE};
+enum Debug debug_mode = DEBUG_NONE;
 
 // Recoding mode for axi_ppm module.
-// NONE     - No PPM recording.
+// REC_NONE     - No PPM recording.
 // RECORD   - BTN_DOWN stores next PPM in array and increments index.
 //			  BTN_UP rewinds the recording by decrementing array index.
-enum Software_Record {NONE, RECORD};
-enum Software_Record record_mode = NONE;
+enum Software_Record {REC_NONE, RECORD};
+enum Software_Record record_mode = REC_NONE;
 
 // Replay mode for axi_ppm module.
-// NONE     - No PPM replay.
+// REPLAY_NONE     - No PPM replay.
 // REPLAY   - BTN_RIGHT transmits any stored PPM values over axi_ppm.
 // 			  BTN_LEFT decrements the current play index.
-enum Software_Replay {NONE, REPLAY};
-enum Software_Replay replay_mode = NONE;
+enum Software_Replay {REPLAY_NONE, REPLAY};
+enum Software_Replay replay_mode = REPLAY_NONE;
 
 // Filter mode for the axi_ppm module.
-// NONE     - No value verification.
+// FILTER_NONE     - No value verification.
 // FILTER   - Verifies all values being sent to the drone to ensure
 //			  those values do not place the craft in an unstable position.
-enum Software_Filter {NONE, FILTER};
-enum Software_Filter filter_mode = NONE;
+enum Software_Filter {FILTER_NONE, FILTER};
+enum Software_Filter filter_mode = FILTER_NONE;
 
 // User given command to exit the program.
 // True = Yes
@@ -91,9 +108,8 @@ int frame_index = 0;
 // Holds the current index of the PPM replay array.
 int replay_index = 0;
 
-
-// Main pulling loop of program.
-void main();
+// Clears memory.
+void clear_memory();
 // Initializes various system components.
 void initialize_system();
 // Checks register values and sets corresponding modes.
@@ -109,4 +125,4 @@ void replay_mode_handler();
 // Verifies all values being sent to the drone.
 void filter_mode_handler();
 // Checks min and max values of each PPM channel.
-void channel_boundary_correction()
+void channel_boundary_correction();

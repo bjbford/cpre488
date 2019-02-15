@@ -7,12 +7,12 @@
 
 // Self-made Libraries.
 #include "rc_control.h"
-#include "platform.c"
+#include "platform.h"
 
 /**
  * Main pulling loop of program.
  */
-void main()
+int main()
 {
 	// Clears potentially uncleared memory.
 	initialize_system();
@@ -34,7 +34,7 @@ void main()
 	// From platform.c : Disables cache.
 	cleanup_platform();
 	// Exit command has been given.
-	return;
+	return 0;
 }
 
 
@@ -46,13 +46,13 @@ void initialize_system()
 	// From platform.c : Setups up cache and uart.
 	init_platform();
 	// Clears potentially uncleared memory on startup.
-	clear_memeory();
+	clear_memory();
 }
 
 /**
  * Ensures memory is cleared.
  */
-void clear_memeory()
+void clear_memory()
 {
 	// Ensure cleared memory for the PPM Frame array.
 	for(int i = 0; i < 50; i++)
@@ -81,13 +81,13 @@ void check_registers()
 	{
 		// Register value 1 detected.
 		// Switching to Hardware Relay Mode.
-		relay_mode = HARDWARE;
+		relay_mode = RELAY_HARDWARE;
 	}
 	else
 	{
 		// Register value 0 detected.
 		// Switching to Software Relay Mode.
-		relay_mode = SOFTWARE;
+		relay_mode = RELAY_SOFTWARE;
 	}
 
 	/************ BUTTON Center ************/
@@ -107,13 +107,13 @@ void check_registers()
     {
     	// Register value 1 detected.
     	// Switching to Software Debug Mode.
-    	debug_mode = SOFTWARE;
+    	debug_mode = DEBUG_SOFTWARE;
 	}
 	else
 	{
 		// Register value 0 detected.
 		// Switching out of debug mode.
-		debug_mode = NONE;
+		debug_mode = DEBUG_NONE;
 	}
 
 	/************ SWITCH 2 ************/
@@ -129,7 +129,7 @@ void check_registers()
 	{
 		// Register value 0 detected.
 		// Switching out of Software Record Mode.
-		record_mode = NONE;
+		record_mode = REC_NONE;
 	}
 
 	/************ SWITCH 3 ************/
@@ -145,7 +145,7 @@ void check_registers()
 	{
 		// Register value 0 detected.
 		// Switching out of Software Replay Mode.
-		replay_mode = NONE;
+		replay_mode = REPLAY_NONE;
 	}
 
 	/************ SWITCH 4 ************/
@@ -155,13 +155,13 @@ void check_registers()
     {
     	// Register value 1 detected.
     	// Switching to Software Filter Mode.
-    	filter_mode = REPLAY;
+    	filter_mode = FILTER;
 	}
 	else
 	{
 		// Register value 0 detected.
 		// Switching out of Software Filter Mode.
-		filter_mode = NONE;
+		filter_mode = FILTER_NONE;
 	}
 
 }
@@ -177,35 +177,35 @@ void check_registers()
 void relay_mode_handler()
 {
 	// HARDWARE Relay Mode active.
-	if(relay_mode == HARDWARE)
+	if(relay_mode == RELAY_HARDWARE)
 	{
 		// Set config register 0 to tell axi_ppm that hardware relay mode
 		// has been enabled. PPM_Input routes directly to PPM_Output.
-		slave_register[0] = 0;
+		*slv_reg0 = 0;
 	}
 	// SOFTWARE Relay Mode active.
-	else if(relay_mode == SOFTWARE)
+	else if(relay_mode == RELAY_SOFTWARE)
 	{
 		// Signals the coping of PPM frames from slave registers 2 -> 7
 		// into slave registers 8 -> 13. 8 thru 13 registers are
 		// then read by axi_ppm module to generate output.
 
 		// Channel 1
-		slave_register[8] = slave_register[2];
+		*slv_reg8 = *slv_reg2;
 		// Channel 2
-		slave_register[9] = slave_register[3];
+		*slv_reg9 = *slv_reg3;
 		// Channel 3
-		slave_register[10] = slave_register[4];
+		*slv_reg10 = *slv_reg4;
 		// Channel 4
-		slave_register[11] = slave_register[5];
+		*slv_reg11 = *slv_reg5;
 		// Channel 5
-		slave_register[12] = slave_register[6];
+		*slv_reg12 = *slv_reg6;
 		// Channel 6
-		slave_register[13] = slave_register[7];
+		*slv_reg13 = *slv_reg7;
 
 		// Set config register 1 to tell axi_ppm that software relay mode
 		// has been enabled. PPM_Output is generated from the copied values.
-		slave_register[0] = 1;
+		*slv_reg0 = 1;
 	}
 }
 
@@ -217,16 +217,16 @@ void relay_mode_handler()
 void debug_mode_handler()
 {
 	// SOFTWARE Debug Mode active.
-	if(debug_mode == SOFTWARE)
+	if(debug_mode == DEBUG_SOFTWARE)
 	{
 		// Output PPM Channel values via UART.
 		// Current PPM Channel values are stored in slave registers 2 thru 7.
-		xil_printf("Channel 1: %d \r\n", slave_register[2]);
-		xil_printf("Channel 2: %d \r\n", slave_register[3]);
-		xil_printf("Channel 3: %d \r\n", slave_register[4]);
-		xil_printf("Channel 4: %d \r\n", slave_register[5]);
-		xil_printf("Channel 5: %d \r\n", slave_register[6]);
-		xil_printf("Channel 6: %d \r\n", slave_register[7]);
+		xil_printf("Channel 1: %d \r\n", *slv_reg2);
+		xil_printf("Channel 2: %d \r\n", *slv_reg3);
+		xil_printf("Channel 3: %d \r\n", *slv_reg4);
+		xil_printf("Channel 4: %d \r\n", *slv_reg5);
+		xil_printf("Channel 5: %d \r\n", *slv_reg6);
+		xil_printf("Channel 6: %d \r\n", *slv_reg7);
 	}
 }
 
@@ -245,17 +245,17 @@ void record_mode_handler()
 		{
 			// Store values.
 			// Channel 1 Value
-			record[frame_index][0] = slave_register[2];
+			record[frame_index][0] = *slv_reg2;
 			// Channel 2 Value
-			record[frame_index][1] = slave_register[3];
+			record[frame_index][1] = *slv_reg3;
 			// Channel 3 Value
-			record[frame_index][2] = slave_register[4];
+			record[frame_index][2] = *slv_reg4;
 			// Channel 4 Value
-			record[frame_index][3] = slave_register[5];
+			record[frame_index][3] = *slv_reg5;
 			// Channel 5 Value
-			record[frame_index][4] = slave_register[6];
+			record[frame_index][4] = *slv_reg6;
 			// Channel 6 Value
-			record[frame_index][5] = slave_register[7];
+			record[frame_index][5] = *slv_reg7;
 
 			// Array boundary detection. Checks if next move will cause out-of-bounds error.
 			if(!((frame_index + 1) > MAX_FRAMES_TO_RECORD))
@@ -299,24 +299,24 @@ void record_mode_handler()
 void replay_mode_handler()
 {
 	// Software Replay Mode active.
-	if(record_mode == REPLAY)
+	if(replay_mode == REPLAY)
 	{
 		// Transmits stored PPM values over axi_ppm.
 		if(*btn_ptr & BTN_RIGHT)
 		{
 			// Output indexed PPM Frame channel values to axi_ppm.
 			// Channel 1
-			slave_register[8] = record[replay_index][0];
+			*slv_reg8 = record[replay_index][0];
 			// Channel 2
-			slave_register[9] = record[replay_index][1];
+			*slv_reg9 = record[replay_index][1];
 			// Channel 3
-			slave_register[10] = record[replay_index][2];
+			*slv_reg10 = record[replay_index][2];
 			// Channel 4
-			slave_register[11] = record[replay_index][3];
+			*slv_reg11 = record[replay_index][3];
 			// Channel 5
-			slave_register[12] = record[replay_index][4];
+			*slv_reg12 = record[replay_index][4];
 			// Channel 6
-			slave_register[13] = record[replay_index][5];
+			*slv_reg13 = record[replay_index][5];
 
 			// Array boundary detection. Checks if next move will cause out-of-bounds error.
 			if(!((replay_index + 1) > MAX_FRAMES_TO_RECORD))
@@ -347,7 +347,7 @@ void replay_mode_handler()
 void filter_mode_handler()
 {
 	// Software Filter Mode active.
-	if(record_mode == FILTER)
+	if(filter_mode == FILTER)
 	{
 		// Ensures channel width value is within its min and max values.
 		channel_boundary_correction();
@@ -403,83 +403,83 @@ void channel_boundary_correction()
 
 	// Checks for out-of-bounds Channel 1 width.
 	// Adjusts to nearest acceptable boundary if beyond limit.
-	int channel_1_clk_cycles = slave_register[2];
+	int channel_1_clk_cycles = *slv_reg2;
 	if(channel_1_clk_cycles < CHANNEL_1_MIN)
 	{
-		slave_register[2] = CHANNEL_1_MIN;
+		*slv_reg2 = CHANNEL_1_MIN;
 	}
 	if(channel_1_clk_cycles > CHANNEL_1_MAX)
 	{
-		slave_register[2] = CHANNEL_1_MAX;
+		*slv_reg2 = CHANNEL_1_MAX;
 	}
 
 	/************ CHANNEL 2 ************/
 
 	// Checks for out-of-bounds Channel 2 width.
 	// Adjusts to nearest acceptable boundary if beyond limit.
-	int channel_2_clk_cycles = slave_register[3];
+	int channel_2_clk_cycles = *slv_reg3;
 	if(channel_2_clk_cycles < CHANNEL_2_MIN)
 	{
-		slave_register[3] = CHANNEL_2_MIN;
+		*slv_reg3 = CHANNEL_2_MIN;
 	}
 	if(channel_2_clk_cycles > CHANNEL_2_MAX)
 	{
-		slave_register[3] = CHANNEL_2_MAX;
+		*slv_reg3 = CHANNEL_2_MAX;
 	}
 
 	/************ CHANNEL 3 ************/
 
 	// Checks for out-of-bounds Channel 3 width.
 	// Adjusts to nearest acceptable boundary if beyond limit.
-	int channel_3_clk_cycles = slave_register[4];
+	int channel_3_clk_cycles = *slv_reg4;
 	if(channel_3_clk_cycles < CHANNEL_3_MIN)
 	{
-		slave_register[4] = CHANNEL_3_MIN;
+		*slv_reg4 = CHANNEL_3_MIN;
 	}
 	if(channel_3_clk_cycles > CHANNEL_3_MAX)
 	{
-		slave_register[4] = CHANNEL_3_MAX;
+		*slv_reg4 = CHANNEL_3_MAX;
 	}
 
 	/************ CHANNEL 4 ************/
 
 	// Checks for out-of-bounds Channel 4 width.
 	// Adjusts to nearest acceptable boundary if beyond limit.
-	int channel_4_clk_cycles = slave_register[5];
+	int channel_4_clk_cycles = *slv_reg5;
 	if(channel_4_clk_cycles < CHANNEL_4_MIN)
 	{
-		slave_register[5] = CHANNEL_4_MIN;
+		*slv_reg5 = CHANNEL_4_MIN;
 	}
 	if(channel_4_clk_cycles > CHANNEL_4_MAX)
 	{
-		slave_register[5] = CHANNEL_4_MAX;
+		*slv_reg5 = CHANNEL_4_MAX;
 	}
 
 	/************ CHANNEL 5 ************/
 
 	// Checks for out-of-bounds Channel 5 width.
 	// Adjusts to nearest acceptable boundary if beyond limit.
-	int channel_5_clk_cycles = slave_register[6];
+	int channel_5_clk_cycles = *slv_reg6;
 	if(channel_5_clk_cycles < CHANNEL_5_MIN)
 	{
-		slave_register[6] = CHANNEL_5_MIN;
+		*slv_reg6 = CHANNEL_5_MIN;
 	}
 	if(channel_5_clk_cycles > CHANNEL_5_MAX)
 	{
-		slave_register[6] = CHANNEL_5_MAX;
+		*slv_reg6 = CHANNEL_5_MAX;
 	}
 
 	/************ CHANNEL 6 ************/
 
 	// Checks for out-of-bounds Channel 6 width.
 	// Adjusts to nearest acceptable boundary if beyond limit.
-	int channel_6_clk_cycles = slave_register[7];
+	int channel_6_clk_cycles = *slv_reg7;
 	if(channel_6_clk_cycles < CHANNEL_6_MIN)
 	{
-		slave_register[7] = CHANNEL_6_MIN;
+		*slv_reg7 = CHANNEL_6_MIN;
 	}
 	if(channel_2_clk_cycles > CHANNEL_6_MAX)
 	{
-		slave_register[7] = CHANNEL_6_MAX;
+		*slv_reg7 = CHANNEL_6_MAX;
 	}
 }
