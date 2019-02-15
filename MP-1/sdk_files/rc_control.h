@@ -36,19 +36,19 @@
 #define register_offset 0x4
 // Slave register macros.
 uint32_t *slv_reg0 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR;
-uint32_t * slv_reg1 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset;
-uint32_t * slv_reg2 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 2;
-uint32_t * slv_reg3 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 3;
-uint32_t * slv_reg4 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 4;
-uint32_t * slv_reg5 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 5;
-uint32_t * slv_reg6 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 6;
-uint32_t * slv_reg7 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 7;
-uint32_t * slv_reg8 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 8;
-uint32_t * slv_reg9 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 9;
-uint32_t * slv_reg10 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 10;
-uint32_t * slv_reg11 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 11;
-uint32_t * slv_reg12 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 12;
-uint32_t * slv_reg13 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 13;
+uint32_t *slv_reg1 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset;
+uint32_t *slv_reg2 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 2;
+uint32_t *slv_reg3 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 3;
+uint32_t *slv_reg4 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 4;
+uint32_t *slv_reg5 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 5;
+uint32_t *slv_reg6 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 6;
+uint32_t *slv_reg7 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 7;
+uint32_t *slv_reg8 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 8;
+uint32_t *slv_reg9 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 9;
+uint32_t *slv_reg10 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 10;
+uint32_t *slv_reg11 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 11;
+uint32_t *slv_reg12 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 12;
+uint32_t *slv_reg13 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset * 13;
 
 // Register address for the switch and button gpio ports.
 uint32_t *sw_ptr = XPAR_SWS_8BITS_BASEADDR;
@@ -108,12 +108,20 @@ int frame_index = 0;
 // Holds the current index of the PPM replay array.
 int replay_index = 0;
 
+// Holds the previous value of slv_reg1. (Frame counter)
+int frame_counter_previous = 0;
+
+int btn_pressed = 0;
+int btn_press = 0;
+int btn_release = 0;
+int bounce_value = 100;
+
 // Clears memory.
 void clear_memory();
 // Initializes various system components.
 void initialize_system();
 // Checks register values and sets corresponding modes.
-void check_registers();
+void check_inputs();
 // Controls how the PPM_Output is generated.
 void relay_mode_handler();
 // Sends PPM Channel values via UART for debugging.

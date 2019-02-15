@@ -18,9 +18,11 @@ architecture ppm_capture_fsm of ppm_capture_fsm is
 	-- should we initialize unknowns here (instead of on hard reset)
 	signal PS, NS : state_type;
 	signal state_resetn : std_logic := '1';
-	signal count_en_sig, channel_count_sig, end_of_frame_sig : std_logic := '0';
+	signal count_en_sig, channel_count_sig, end_of_frame_sig, debounce_success : std_logic := '0';
 	signal write_addr_sig : std_logic_vector(2 downto 0) := "000";
 	signal cycle_count_sig : std_logic_vector(31 downto 0) := x"00000000";
+	signal debounce_sig : std_logic := '1';
+	signal debounce_cnt : unsigned (3 downto 0) := "0000";
 	
 	begin
 	cycle_count <= cycle_count_sig;
@@ -36,7 +38,26 @@ architecture ppm_capture_fsm of ppm_capture_fsm is
 		end if;
 	end process sync_proc;
 	
-	comb_proc: process(PS, ppm_input, state_resetn)
+	debounce_proc: process(CLK)
+		begin
+		if(rising_edge(CLK)) then
+			debounce_sig <= ppm_input;
+			
+			if(debounce_cnt = "1111") then 
+				debounce_cnt <= "0000";
+				debounce_success <= '1';
+			elsif(debounce_sig = ppm_input) then
+				debounce_cnt <= debounce_cnt + 1;
+				debounce_success <= '0';
+			else
+				debounce_cnt <= "0000";
+				debounce_success <= '0';
+			end if;
+
+		end if;
+	end process debounce_proc;
+	
+	comb_proc: process(PS, ppm_input, state_resetn, debounce_success)
 		begin
 		--default value assignments
 		NS <= idle;
@@ -47,19 +68,31 @@ architecture ppm_capture_fsm of ppm_capture_fsm is
 			--idle state
 			when idle =>
 				count_en_sig <= '0';
-				if (ppm_input='0') then NS<=gap; channel_count_sig <= '0'; write_en <= '0';
+				if (ppm_input='0') then
+					if(debounce_success = '1') then
+						NS<=gap; channel_count_sig <= '0'; write_en <= '0';
+					else NS <= idle; channel_count_sig <= '0'; write_en <= '0';
+					end if;
 				else NS <= idle; channel_count_sig <= '0'; write_en <= '0';
 				end if;
 			--gap state
 			when gap =>
 				count_en_sig <= '0'; 
-				if (ppm_input='0') then NS<=gap; channel_count_sig <= '0'; write_en <= '0';
-				else NS <= channel; channel_count_sig <= '1'; write_en <= '0';
+				if (ppm_input='1') then
+					if(debounce_success = '1') then 
+						NS <= channel; channel_count_sig <= '1'; write_en <= '0';
+					else NS<=gap; channel_count_sig <= '0'; write_en <= '0';
+					end if;
+				else NS<=gap; channel_count_sig <= '0'; write_en <= '0';
 				end if;
 			--channel state
 			when channel =>
 				count_en_sig <= '1';
-				if (ppm_input='0') then NS<=gap; channel_count_sig <= '0'; write_en <= '1';
+				if (ppm_input='0') then
+					if(debounce_success = '1') then 
+						NS<=gap; channel_count_sig <= '0'; write_en <= '1';
+					else NS <= channel;  channel_count_sig <= '0'; write_en <= '0';
+					end if;
 				elsif (state_resetn = '0') then NS <= idle; channel_count_sig <= '0'; write_en <= '0';
 				else NS <= channel;  channel_count_sig <= '0'; write_en <= '0';
 				end if;

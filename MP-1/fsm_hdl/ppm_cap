@@ -1,6 +1,6 @@
-add wave -position insertpoint sim:/ppm_capture/*
-force -freeze sim:/ppm_capture/ppm_input 1 0
-force -freeze sim:/ppm_capture/CLK 1 0, 0 {25 ns} -r 50
-force -freeze sim:/ppm_capture/ppm_capture_resetn 0 0
+add wave -position insertpoint sim:/ppm_capture_fsm/*
+force -freeze sim:/ppm_capture_fsm/ppm_input 1 0
+force -freeze sim:/ppm_capture_fsm/CLK 1 0, 0 {25 ns} -r 50
+force -freeze sim:/ppm_capture_fsm/ppm_cap_resetn 0 0
 run
-force -freeze sim:/ppm_capture/ppm_capture_resetn 1 0
+force -freeze sim:/ppm_capture_fsm/ppm_cap_resetn 1 0

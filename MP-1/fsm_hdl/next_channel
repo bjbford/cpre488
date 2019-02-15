@@ -1,7 +1,7 @@
-force -freeze sim:/ppm_capture/ppm_input 0 0
+force -freeze sim:/ppm_capture_fsm/ppm_input 0 0
 run
 run
-force -freeze sim:/ppm_capture/ppm_input 1 0
+force -freeze sim:/ppm_capture_fsm/ppm_input 1 0
 run
 run
 run
