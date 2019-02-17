@@ -32,8 +32,9 @@
 
 // Used in the record array to store PPM frames w/ their channel values.
 #define MAX_FRAMES_TO_RECORD 50
-
+// Holds the 32 bit offset between slave registers.
 #define register_offset 0x4
+
 // Slave register macros.
 uint32_t *slv_reg0 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR;
 uint32_t *slv_reg1 = XPAR_AXI_PPM_0_S00_AXI_BASEADDR + register_offset;
@@ -64,10 +65,10 @@ enum Relay relay_mode = RELAY_HARDWARE;
 // Debug mode for axi_ppm module.
 // DEBUG_NONE     - No UART output.
 // DEBUG_SOFTWARE - Prints (via UART) values of PPM channels stored
-//			  in slave registers from the axi_ppm module.
+//			        in slave registers from the axi_ppm module.
 enum Debug {DEBUG_NONE, DEBUG_SOFTWARE};
-enum Debug debug_mode = DEBUG_NONE;
 
+enum Debug debug_mode = DEBUG_NONE;
 // Recoding mode for axi_ppm module.
 // REC_NONE     - No PPM recording.
 // RECORD   - BTN_DOWN stores next PPM in array and increments index.
@@ -111,10 +112,27 @@ int replay_index = 0;
 // Holds the previous value of slv_reg1. (Frame counter)
 int frame_counter_previous = 0;
 
-int btn_pressed = 0;
-int btn_press = 0;
-int btn_release = 0;
-int bounce_value = 100;
+// General purpose debug counter for number of button presses.
+int counter = 0;
+
+// Counter the number of cycles the button has been pressed. (Debounce)
+int btn_active_count = 0;
+
+// Status of all button presses. True if one or more buttons are pressed.
+// False otherwise.
+bool button_flag = false;
+
+// True = debounce_counter has hit or exceeded the debounce_threshold.
+// False = not yet hit needed cycles.
+bool debounce_finished = false;
+
+// Counter used to debounce the buttons.
+int debounce_counter = 0;
+
+// Amount that the debounce counter has to hit to execute the buttons funtions.
+int debounce_threshold = 15;
+
+
 
 // Clears memory.
 void clear_memory();

@@ -20,11 +20,15 @@ int main()
 	// Program will run until exit command is given.
 	while(exit_flag == false)
 	{
-		// Checks register values of certain buttons & switches.
-		// Sets modes appropriately.
-		check_inputs();
+		// Only accepts frame input when the End Of Frame pulse has been
+		// detected.
 		if(frame_counter_previous != *slv_reg1)
 		{
+			// New cycle. Reset needed status flags.
+			button_flag = false;
+			// Checks register values of certain buttons & switches.
+			// Sets modes appropriately.
+			check_inputs();
 			// Controls how the PPM_Output is generated.
 			relay_mode_handler();
 			// Outputs current channel values over UART.
@@ -33,14 +37,18 @@ int main()
 			record_mode_handler();
 			// Verifies all values being sent to the drone.
 			filter_mode_handler();
-		}
-		else
-		{
 			// Replays the PPM Frame values to the axi_ppm.
 			replay_mode_handler();
+			// No buttons were pressed during the last cycle. 
+			if(button_flag == false)
+			{
+				// Reset the counter used for button debouncing.
+				debounce_counter = 0;
+			}
 		}
 		// Assigns new previous values.
 		frame_counter_previous = *slv_reg1;
+		
 	}
 	// From platform.c : Disables cache.
 	cleanup_platform();
@@ -106,28 +114,9 @@ void check_inputs()
 	// Checks for valid BUTTON Center.
 	if(*btn_ptr & BTN_CENTER)
 	{
-		btn_press++;
-		btn_release = 0;
-		if(btn_press > bounce_value)
-		{
-			if(btn_pressed == 0)
-			{
-				// Center button press detected.
-				// Exit application flag set.
-				exit_flag = true;
-			}
-			btn_press = 0;
-		}
-	}
-	else
-	{
-		btn_release++;
-		btn_press = 0;
-		if(btn_release > bounce_value)
-		{
-			btn_pressed = 0;
-			btn_release = 0;
-		}
+		// Center button press detected.
+		// Exit application flag set.
+		exit_flag = true;
 	}
 
 	/************ SWITCH 1 ************/
@@ -256,7 +245,7 @@ void debug_mode_handler()
 //		xil_printf("Ch 2: %d \t\t", *slv_reg3);
 		xil_printf("Ch 3: %d \t\t", *slv_reg4);
 //		xil_printf("Ch 4: %d \t\t", *slv_reg5);
-//		xil_printf("Ch 5: %d \t\t", *slv_reg6);
+//		xil_printf("Ch 5: %d \t\t", *slv_reg6);s
 //		xil_printf("Ch 6: %d \r", *slv_reg7);
 	}
 }
@@ -274,55 +263,49 @@ void record_mode_handler()
 		// Stores next PPM Frame w/ channel vaues in array and increments Frame index.
 		if(*btn_ptr & BTN_DOWN)
 		{
-			if(0)
-			{
-				// Store values.
-				// Channel 1 Value
-				record[frame_index][0] = *slv_reg2;
-				// Channel 2 Value
-				record[frame_index][1] = *slv_reg3;
-				// Channel 3 Value
-				record[frame_index][2] = *slv_reg4;
-				// Channel 4 Value
-				record[frame_index][3] = *slv_reg5;
-				// Channel 5 Value
-				record[frame_index][4] = *slv_reg6;
-				// Channel 6 Value
-				record[frame_index][5] = *slv_reg7;
+			// Store values.
+			// Channel 1 Value
+			record[frame_index][0] = *slv_reg2;
+			// Channel 2 Value
+			record[frame_index][1] = *slv_reg3;
+			// Channel 3 Value
+			record[frame_index][2] = *slv_reg4;
+			// Channel 4 Value
+			record[frame_index][3] = *slv_reg5;
+			// Channel 5 Value
+			record[frame_index][4] = *slv_reg6;
+			// Channel 6 Value
+			record[frame_index][5] = *slv_reg7;
 
-				// Array boundary detection. Checks if next move will cause out-of-bounds error.
-				if(!((frame_index + 1) > MAX_FRAMES_TO_RECORD))
-				{
-					// Increments the frame index.
-					frame_index++;
-				}
+			// Array boundary detection. Checks if next move will cause out-of-bounds error.
+			if(!((frame_index + 1) > MAX_FRAMES_TO_RECORD))
+			{
+				// Increments the frame index.
+				frame_index++;
 			}
 		}
 		// Rewinds the recording by decrementing array index.
 		else if(*btn_ptr & BTN_UP)
 		{
-			if(0)
-			{
-				// Clear current Frame data.
-				// Channel 1 Value
-				record[frame_index][0] = 0;
-				// Channel 2 Value
-				record[frame_index][1] = 0;
-				// Channel 3 Value
-				record[frame_index][2] = 0;
-				// Channel 4 Value
-				record[frame_index][3] = 0;
-				// Channel 5 Value
-				record[frame_index][4] = 0;
-				// Channel 6 Value
-				record[frame_index][5] = 0;
+			// Clear current Frame data.
+			// Channel 1 Value
+			record[frame_index][0] = 0;
+			// Channel 2 Value
+			record[frame_index][1] = 0;
+			// Channel 3 Value
+			record[frame_index][2] = 0;
+			// Channel 4 Value
+			record[frame_index][3] = 0;
+			// Channel 5 Value
+			record[frame_index][4] = 0;
+			// Channel 6 Value
+			record[frame_index][5] = 0;
 
-				// Array boundary detection. Checks if next move will cause out-of-bounds error.
-				if(!((frame_index - 1) < 0))
-				{
-					// Moves left one column in the 2D array.
-					frame_index--;
-				}
+			// Array boundary detection. Checks if next move will cause out-of-bounds error.
+			if(!((frame_index - 1) < 0))
+			{
+				// Moves left one column in the 2D array.
+				frame_index--;
 			}
 		}
 	}
@@ -341,11 +324,22 @@ void replay_mode_handler()
 		// Transmits stored PPM values over axi_ppm.
 		if(*btn_ptr & BTN_RIGHT)
 		{
-			btn_press++;
-			btn_release = 0;
-			if(btn_press > bounce_value)
+			// A button has been pressed.
+			button_flag = true;
+			// The debounce counter has yet to hit the needed cycles. 
+			if(debounce_counter < debounce_threshold)
 			{
-				xil_printf("Right button pressed");
+				debounce_counter++;
+				// Signals the a button has started the debounce process.
+				debounce_finished = false;
+			}
+			// Enough cycles have passed of constant button press && this button's functions
+			// have yet to be executed for this press.
+			else if((debounce_counter >= debounce_threshold) && (debounce_finished == true))
+			{
+				// Debounce process finished.
+				debounce_finished = true;
+				xil_printf("Right button pressed. #: %d", counter++);
 				// Output indexed PPM Frame channel values to axi_ppm.
 				// Channel 1
 				*slv_reg8 = record[replay_index][0];
@@ -367,42 +361,15 @@ void replay_mode_handler()
 					replay_index++;
 				}
 			}
-			btn_press = 0;
-		}
-		else
-		{
-			btn_release++;
-			btn_press = 0;
-			if(btn_release > bounce_value)
-			{
-				btn_pressed = 0;
-				btn_release = 0;
-			}
 		}
 		// Decrement the current play index.
 		if(*btn_ptr & BTN_LEFT)
 		{
-			btn_press++;
-			btn_release = 0;
-			if(btn_press > bounce_value)
+			// Array boundary detection. Checks if next move will cause out-of-bounds error.
+			if(!((replay_index - 1) < 0))
 			{
-				// Array boundary detection. Checks if next move will cause out-of-bounds error.
-				if(!((replay_index - 1) < 0))
-				{
-					// Array will be inbounds.
-					replay_index--;
-				}
-			}
-			btn_press = 0;
-		}
-		else
-		{
-			btn_release++;
-			btn_press = 0;
-			if(btn_release > bounce_value)
-			{
-				btn_pressed = 0;
-				btn_release = 0;
+				// Array will be inbounds.
+				replay_index--;
 			}
 		}
 	}
