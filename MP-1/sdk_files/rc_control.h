@@ -130,7 +130,7 @@ bool debounce_finished = false;
 int debounce_counter = 0;
 
 // Amount that the debounce counter has to hit to execute the buttons funtions.
-int debounce_threshold = 15;
+int debounce_threshold = 10;
 
 
 

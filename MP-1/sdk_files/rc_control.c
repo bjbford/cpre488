@@ -22,8 +22,8 @@ int main()
 	{
 		// Only accepts frame input when the End Of Frame pulse has been
 		// detected.
-		if(frame_counter_previous != *slv_reg1)
-		{
+//		if(frame_counter_previous != *slv_reg1)
+//		{
 			// New cycle. Reset needed status flags.
 			button_flag = false;
 			// Checks register values of certain buttons & switches.
@@ -45,7 +45,7 @@ int main()
 				// Reset the counter used for button debouncing.
 				debounce_counter = 0;
 			}
-		}
+//		}
 		// Assigns new previous values.
 		frame_counter_previous = *slv_reg1;
 		
@@ -335,11 +335,11 @@ void replay_mode_handler()
 			}
 			// Enough cycles have passed of constant button press && this button's functions
 			// have yet to be executed for this press.
-			else if((debounce_counter >= debounce_threshold) && (debounce_finished == true))
+			else if((debounce_counter >= debounce_threshold) && (debounce_finished != true))
 			{
 				// Debounce process finished.
 				debounce_finished = true;
-				xil_printf("Right button pressed. #: %d", counter++);
+				xil_printf("Right button pressed. #: %d\r\n", counter++);
 				// Output indexed PPM Frame channel values to axi_ppm.
 				// Channel 1
 				*slv_reg8 = record[replay_index][0];
