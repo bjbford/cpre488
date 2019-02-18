@@ -22,8 +22,8 @@ int main()
 	{
 		// Only accepts frame input when the End Of Frame pulse has been
 		// detected.
-//		if(frame_counter_previous != *slv_reg1)
-//		{
+		if(frame_counter_previous != *slv_reg1)
+		{
 			// New cycle. Reset needed status flags.
 			button_flag = false;
 			// Checks register values of certain buttons & switches.
@@ -39,16 +39,16 @@ int main()
 			filter_mode_handler();
 			// Replays the PPM Frame values to the axi_ppm.
 			replay_mode_handler();
-			// No buttons were pressed during the last cycle. 
-			if(button_flag == false)
-			{
-				// Reset the counter used for button debouncing.
-				debounce_counter = 0;
-			}
-//		}
+
+		}
 		// Assigns new previous values.
 		frame_counter_previous = *slv_reg1;
-		
+		// No buttons were pressed during the last cycle.
+		if(button_flag == false)
+		{
+			// Reset the counter used for button debouncing.
+			debounce_counter = 0;
+		}
 	}
 	// From platform.c : Disables cache.
 	cleanup_platform();
@@ -94,19 +94,19 @@ void check_inputs()
     /************ SWITCH 0 ************/
 
 	// Checks SWITCH 0's register value.
-	// If True -> Hardware Relay Mode
-	// If False -> Software Relay Mode
+	// If True -> Software Relay Mode
+	// If False -> Hardware Relay Mode
 	if(*sw_ptr & SW_0)
-	{
-		// Register value 1 detected.
-		// Switching to Hardware Relay Mode.
-		relay_mode = RELAY_HARDWARE;
-	}
-	else
 	{
 		// Register value 0 detected.
 		// Switching to Software Relay Mode.
 		relay_mode = RELAY_SOFTWARE;
+	}
+	else
+	{
+		// Register value 1 detected.
+		// Switching to Hardware Relay Mode.
+		relay_mode = RELAY_HARDWARE;
 	}
 
 	/************ BUTTON Center ************/
@@ -225,20 +225,22 @@ void relay_mode_handler()
 		// Signals the coping of PPM frames from slave registers 2 -> 7
 		// into slave registers 8 -> 13. 8 thru 13 registers are
 		// then read by axi_ppm module to generate output.
-
-		// Channel 1
-		*slv_reg8 = *slv_reg2;
-		// Channel 2
-		*slv_reg9 = *slv_reg3;
-		// Channel 3
-		*slv_reg10 = *slv_reg4;
-		// Channel 4
-		*slv_reg11 = *slv_reg5;
-		// Channel 5
-		*slv_reg12 = *slv_reg6;
-		// Channel 6
-		*slv_reg13 = *slv_reg7;
-
+		// ONLY COPY WHEN NOT IN REPLAY MODE, OTHERWISE HOLD PREV.VALUES
+		if(replay_mode == REPLAY_NONE)
+		{
+			// Channel 1
+			*slv_reg8 = *slv_reg2;
+			// Channel 2
+			*slv_reg9 = *slv_reg3;
+			// Channel 3
+			*slv_reg10 = *slv_reg4;
+			// Channel 4
+			*slv_reg11 = *slv_reg5;
+			// Channel 5
+			*slv_reg12 = *slv_reg6;
+			// Channel 6
+			*slv_reg13 = *slv_reg7;
+		}
 		// Set config register 1 to tell axi_ppm that software relay mode
 		// has been enabled. PPM_Output is generated from the copied values.
 		*slv_reg0 = 1;
@@ -257,12 +259,12 @@ void debug_mode_handler()
 	{
 		// Output PPM Channel values via UART.
 		// Current PPM Channel values are stored in slave registers 2 thru 7.
-//		xil_printf("Ch 1: %6d    Ch 2: %6d    Ch 3: %6d    Ch 4: %6d    Ch 5: %6d    Ch 6: %6d \r", *slv_reg2, *slv_reg3, *slv_reg4, *slv_reg5, *slv_reg6, *slv_reg7);
+		xil_printf("Ch 1: %6d    Ch 2: %6d    Ch 3: %6d    Ch 4: %6d    Ch 5: %6d    Ch 6: %6d \r", *slv_reg2, *slv_reg3, *slv_reg4, *slv_reg5, *slv_reg6, *slv_reg7);
 //		xil_printf("Ch 1: %d \t\t", *slv_reg2);
 //		xil_printf("Ch 2: %d \t\t", *slv_reg3);
-		xil_printf("Ch 3: %d \t\t", *slv_reg4);
+//		xil_printf("Ch 3: %d \t\t", *slv_reg4);
 //		xil_printf("Ch 4: %d \t\t", *slv_reg5);
-//		xil_printf("Ch 5: %d \t\t", *slv_reg6);s
+//		xil_printf("Ch 5: %d \t\t", *slv_reg6);
 //		xil_printf("Ch 6: %d \r", *slv_reg7);
 	}
 }
@@ -296,6 +298,7 @@ void record_mode_handler()
 				// Debounce process finished.
 				debounce_finished = true;
 				xil_printf("Down button pressed. #: %d\r\n", counter++);
+				xil_printf("Frame Recorded @ index: %d\r\n", frame_index);
 				// Store values.
 				// Channel 1 Value
 				record[frame_index][0] = *slv_reg2;
@@ -319,7 +322,7 @@ void record_mode_handler()
 			}
 		}
 		// Rewinds the recording by decrementing array index.
-		else if(*btn_ptr & BTN_UP)
+		if(*btn_ptr & BTN_UP)
 		{
 			// A button has been pressed.
 			button_flag = true;
@@ -356,6 +359,7 @@ void record_mode_handler()
 				{
 					// Moves left one column in the 2D array.
 					frame_index--;
+					xil_printf("Record index decremented to: %d\r\n", frame_index);
 				}
 			}
 		}
@@ -392,6 +396,7 @@ void replay_mode_handler()
 				debounce_finished = true;
 				xil_printf("RIGHT button pressed. #: %d\r\n", counter++);
 				// Output indexed PPM Frame channel values to axi_ppm.
+				xil_printf("Frame Replayed @ index: %d\r\n", replay_index);
 				// Channel 1
 				*slv_reg8 = record[replay_index][0];
 				// Channel 2
@@ -437,6 +442,7 @@ void replay_mode_handler()
 				{
 					// Array will be inbounds.
 					replay_index--;
+					xil_printf("Replay index decremented to: %d\r\n", replay_index);
 				}
 			}
 		}
@@ -504,87 +510,112 @@ void channel_boundary_correction()
 	#define CHANNEL_6_MIN 60000
 	#define CHANNEL_6_MAX 162500
 
+	xil_printf("Before Filter\r\n");
+	xil_printf("Ch 1: %6d    Ch 2: %6d    Ch 3: %6d    Ch 4: %6d    Ch 5: %6d    Ch 6: %6d \r\n", *slv_reg2, *slv_reg3, *slv_reg4, *slv_reg5, *slv_reg6, *slv_reg7);
+
 	/************ CHANNEL 1 ************/
 
 	// Checks for out-of-bounds Channel 1 width.
 	// Adjusts to nearest acceptable boundary if beyond limit.
-	int channel_1_clk_cycles = *slv_reg2;
-	if(channel_1_clk_cycles < CHANNEL_1_MIN)
+	if(*slv_reg2 < CHANNEL_1_MIN)
 	{
-		*slv_reg2 = CHANNEL_1_MIN;
+		*slv_reg8 = CHANNEL_1_MIN;
 	}
-	if(channel_1_clk_cycles > CHANNEL_1_MAX)
+	else if(*slv_reg2 > CHANNEL_1_MAX)
 	{
-		*slv_reg2 = CHANNEL_1_MAX;
+		*slv_reg8 = CHANNEL_1_MAX;
+	}
+	else
+	{
+		*slv_reg8 = *slv_reg2;
 	}
 
 	/************ CHANNEL 2 ************/
 
 	// Checks for out-of-bounds Channel 2 width.
-	// Adjusts to nearest acceptable boundary if beyond limit.
-	int channel_2_clk_cycles = *slv_reg3;
-	if(channel_2_clk_cycles < CHANNEL_2_MIN)
+	// Adjusts to nearest acceptable boundary if beyond limit
+	if(*slv_reg3 < CHANNEL_2_MIN)
 	{
-		*slv_reg3 = CHANNEL_2_MIN;
+		*slv_reg9 = CHANNEL_2_MIN;
 	}
-	if(channel_2_clk_cycles > CHANNEL_2_MAX)
+	else if(*slv_reg3 > CHANNEL_2_MAX)
 	{
-		*slv_reg3 = CHANNEL_2_MAX;
+		*slv_reg9 = CHANNEL_2_MAX;
+	}
+	else
+	{
+		*slv_reg9 = *slv_reg3;
 	}
 
 	/************ CHANNEL 3 ************/
 
 	// Checks for out-of-bounds Channel 3 width.
 	// Adjusts to nearest acceptable boundary if beyond limit.
-	int channel_3_clk_cycles = *slv_reg4;
-	if(channel_3_clk_cycles < CHANNEL_3_MIN)
+	if(*slv_reg4 < CHANNEL_3_MIN)
 	{
-		*slv_reg4 = CHANNEL_3_MIN;
+		*slv_reg10 = CHANNEL_3_MIN;
 	}
-	if(channel_3_clk_cycles > CHANNEL_3_MAX)
+	else if(*slv_reg4 > CHANNEL_3_MAX)
 	{
-		*slv_reg4 = CHANNEL_3_MAX;
+		*slv_reg10 = CHANNEL_3_MAX;
+	}
+	else
+	{
+		*slv_reg10 = *slv_reg4;
 	}
 
 	/************ CHANNEL 4 ************/
 
 	// Checks for out-of-bounds Channel 4 width.
 	// Adjusts to nearest acceptable boundary if beyond limit.
-	int channel_4_clk_cycles = *slv_reg5;
-	if(channel_4_clk_cycles < CHANNEL_4_MIN)
+	if(*slv_reg5 < CHANNEL_4_MIN)
 	{
-		*slv_reg5 = CHANNEL_4_MIN;
+		*slv_reg11 = CHANNEL_4_MIN;
 	}
-	if(channel_4_clk_cycles > CHANNEL_4_MAX)
+	else if(*slv_reg5 > CHANNEL_4_MAX)
 	{
-		*slv_reg5 = CHANNEL_4_MAX;
+		*slv_reg11 = CHANNEL_4_MAX;
+	}
+	else
+	{
+		*slv_reg11 = *slv_reg5;
 	}
 
 	/************ CHANNEL 5 ************/
 
 	// Checks for out-of-bounds Channel 5 width.
 	// Adjusts to nearest acceptable boundary if beyond limit.
-	int channel_5_clk_cycles = *slv_reg6;
-	if(channel_5_clk_cycles < CHANNEL_5_MIN)
+	if(*slv_reg6 < CHANNEL_5_MIN)
 	{
-		*slv_reg6 = CHANNEL_5_MIN;
+		*slv_reg12 = CHANNEL_5_MIN;
 	}
-	if(channel_5_clk_cycles > CHANNEL_5_MAX)
+	else if(*slv_reg6 > CHANNEL_5_MAX)
 	{
-		*slv_reg6 = CHANNEL_5_MAX;
+		*slv_reg12 = CHANNEL_5_MAX;
+	}
+	else
+	{
+		*slv_reg12 = *slv_reg6;
 	}
 
 	/************ CHANNEL 6 ************/
 
 	// Checks for out-of-bounds Channel 6 width.
 	// Adjusts to nearest acceptable boundary if beyond limit.
-	int channel_6_clk_cycles = *slv_reg7;
-	if(channel_6_clk_cycles < CHANNEL_6_MIN)
+	if(*slv_reg7 < CHANNEL_6_MIN)
 	{
-		*slv_reg7 = CHANNEL_6_MIN;
+		*slv_reg13 = CHANNEL_6_MIN;
 	}
-	if(channel_2_clk_cycles > CHANNEL_6_MAX)
+	else if(*slv_reg7 > CHANNEL_6_MAX)
 	{
-		*slv_reg7 = CHANNEL_6_MAX;
+		*slv_reg13 = CHANNEL_6_MAX;
 	}
+	else
+	{
+		*slv_reg13 = *slv_reg7;
+	}
+
+	xil_printf("After Filter\r\n");
+	xil_printf("Ch 1: %6d    Ch 2: %6d    Ch 3: %6d    Ch 4: %6d    Ch 5: %6d    Ch 6: %6d \r\n", *slv_reg8, *slv_reg9, *slv_reg10, *slv_reg11, *slv_reg12, *slv_reg13);
+
 }
