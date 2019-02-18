@@ -31,7 +31,8 @@
 #define BTN_UP     0x10  // Unconfirmed
 
 // Used in the record array to store PPM frames w/ their channel values.
-#define MAX_FRAMES_TO_RECORD 50
+// 3,000 frames = 1 second (1 min / 20ms = 3000 frames per second)
+#define MAX_FRAMES_TO_RECORD 3000
 // Holds the 32 bit offset between slave registers.
 #define register_offset 0x4
 
@@ -114,24 +115,6 @@ int frame_counter_previous = 0;
 
 // General purpose debug counter for number of button presses.
 int counter = 0;
-
-// Counter the number of cycles the button has been pressed. (Debounce)
-int btn_active_count = 0;
-
-// Status of all button presses. True if one or more buttons are pressed.
-// False otherwise.
-bool button_flag = false;
-
-// True = debounce_counter has hit or exceeded the debounce_threshold.
-// False = not yet hit needed cycles.
-bool debounce_finished = false;
-
-// Counter used to debounce the buttons.
-int debounce_counter = 0;
-
-// Amount that the debounce counter has to hit to execute the buttons funtions.
-int debounce_threshold = 10;
-
 
 
 // Clears memory.

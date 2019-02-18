@@ -24,8 +24,6 @@ int main()
 		// detected.
 		if(frame_counter_previous != *slv_reg1)
 		{
-			// New cycle. Reset needed status flags.
-			button_flag = false;
 			// Checks register values of certain buttons & switches.
 			// Sets modes appropriately.
 			check_inputs();
@@ -44,11 +42,6 @@ int main()
 		// Assigns new previous values.
 		frame_counter_previous = *slv_reg1;
 		// No buttons were pressed during the last cycle.
-		if(button_flag == false)
-		{
-			// Reset the counter used for button debouncing.
-			debounce_counter = 0;
-		}
 	}
 	// From platform.c : Disables cache.
 	cleanup_platform();
@@ -260,12 +253,6 @@ void debug_mode_handler()
 		// Output PPM Channel values via UART.
 		// Current PPM Channel values are stored in slave registers 2 thru 7.
 		xil_printf("Ch 1: %6d    Ch 2: %6d    Ch 3: %6d    Ch 4: %6d    Ch 5: %6d    Ch 6: %6d \r", *slv_reg2, *slv_reg3, *slv_reg4, *slv_reg5, *slv_reg6, *slv_reg7);
-//		xil_printf("Ch 1: %d \t\t", *slv_reg2);
-//		xil_printf("Ch 2: %d \t\t", *slv_reg3);
-//		xil_printf("Ch 3: %d \t\t", *slv_reg4);
-//		xil_printf("Ch 4: %d \t\t", *slv_reg5);
-//		xil_printf("Ch 5: %d \t\t", *slv_reg6);
-//		xil_printf("Ch 6: %d \r", *slv_reg7);
 	}
 }
 
@@ -282,85 +269,53 @@ void record_mode_handler()
 		// Stores next PPM Frame w/ channel vaues in array and increments Frame index.
 		if(*btn_ptr & BTN_DOWN)
 		{
-			// A button has been pressed.
-			button_flag = true;
-			// The debounce counter has yet to hit the needed cycles. 
-			if(debounce_counter < debounce_threshold)
-			{
-				debounce_counter++;
-				// Signals the a button has started the debounce process.
-				debounce_finished = false;
-			}
-			// Enough cycles have passed of constant button press && this button's functions
-			// have yet to be executed for this press.
-			else if((debounce_counter >= debounce_threshold) && (debounce_finished != true))
-			{
-				// Debounce process finished.
-				debounce_finished = true;
-				xil_printf("Down button pressed. #: %d\r\n", counter++);
-				xil_printf("Frame Recorded @ index: %d\r\n", frame_index);
-				// Store values.
-				// Channel 1 Value
-				record[frame_index][0] = *slv_reg2;
-				// Channel 2 Value
-				record[frame_index][1] = *slv_reg3;
-				// Channel 3 Value
-				record[frame_index][2] = *slv_reg4;
-				// Channel 4 Value
-				record[frame_index][3] = *slv_reg5;
-				// Channel 5 Value
-				record[frame_index][4] = *slv_reg6;
-				// Channel 6 Value
-				record[frame_index][5] = *slv_reg7;
+			xil_printf("Down button pressed. #: %d\r\n", counter++);
+			xil_printf("Frame Recorded @ index: %d\r\n", frame_index);
+			// Store values.
+			// Channel 1 Value
+			record[frame_index][0] = *slv_reg2;
+			// Channel 2 Value
+			record[frame_index][1] = *slv_reg3;
+			// Channel 3 Value
+			record[frame_index][2] = *slv_reg4;
+			// Channel 4 Value
+			record[frame_index][3] = *slv_reg5;
+			// Channel 5 Value
+			record[frame_index][4] = *slv_reg6;
+			// Channel 6 Value
+			record[frame_index][5] = *slv_reg7;
 
-				// Array boundary detection. Checks if next move will cause out-of-bounds error.
-				if(!((frame_index + 1) > MAX_FRAMES_TO_RECORD))
-				{
-					// Increments the frame index.
-					frame_index++;
-				}
+			// Array boundary detection. Checks if next move will cause out-of-bounds error.
+			if(!((frame_index + 1) > MAX_FRAMES_TO_RECORD))
+			{
+				// Increments the frame index.
+				frame_index++;
 			}
 		}
 		// Rewinds the recording by decrementing array index.
 		if(*btn_ptr & BTN_UP)
 		{
-			// A button has been pressed.
-			button_flag = true;
-			// The debounce counter has yet to hit the needed cycles. 
-			if(debounce_counter < debounce_threshold)
-			{
-				debounce_counter++;
-				// Signals the a button has started the debounce process.
-				debounce_finished = false;
-			}
-			// Enough cycles have passed of constant button press && this button's functions
-			// have yet to be executed for this press.
-			else if((debounce_counter >= debounce_threshold) && (debounce_finished != true))
-			{
-				// Debounce process finished.
-				debounce_finished = true;
-				xil_printf("UP button pressed. #: %d\r\n", counter++);
-				// Clear current Frame data.
-				// Channel 1 Value
-				record[frame_index][0] = 0;
-				// Channel 2 Value
-				record[frame_index][1] = 0;
-				// Channel 3 Value
-				record[frame_index][2] = 0;
-				// Channel 4 Value
-				record[frame_index][3] = 0;
-				// Channel 5 Value
-				record[frame_index][4] = 0;
-				// Channel 6 Value
-				record[frame_index][5] = 0;
+			xil_printf("UP button pressed. #: %d\r\n", counter++);
+			// Clear current Frame data.
+			// Channel 1 Value
+			record[frame_index][0] = 0;
+			// Channel 2 Value
+			record[frame_index][1] = 0;
+			// Channel 3 Value
+			record[frame_index][2] = 0;
+			// Channel 4 Value
+			record[frame_index][3] = 0;
+			// Channel 5 Value
+			record[frame_index][4] = 0;
+			// Channel 6 Value
+			record[frame_index][5] = 0;
 
-				// Array boundary detection. Checks if next move will cause out-of-bounds error.
-				if(!((frame_index - 1) < 0))
-				{
-					// Moves left one column in the 2D array.
-					frame_index--;
-					xil_printf("Record index decremented to: %d\r\n", frame_index);
-				}
+			// Array boundary detection. Checks if next move will cause out-of-bounds error.
+			if(!((frame_index - 1) < 0))
+			{
+				// Moves left one column in the 2D array.
+				frame_index--;
+				xil_printf("Record index decremented to: %d\r\n", frame_index);
 			}
 		}
 	}
@@ -379,71 +334,39 @@ void replay_mode_handler()
 		// Transmits stored PPM values over axi_ppm.
 		if(*btn_ptr & BTN_RIGHT)
 		{
-			// A button has been pressed.
-			button_flag = true;
-			// The debounce counter has yet to hit the needed cycles. 
-			if(debounce_counter < debounce_threshold)
-			{
-				debounce_counter++;
-				// Signals the a button has started the debounce process.
-				debounce_finished = false;
-			}
-			// Enough cycles have passed of constant button press && this button's functions
-			// have yet to be executed for this press.
-			else if((debounce_counter >= debounce_threshold) && (debounce_finished != true))
-			{
-				// Debounce process finished.
-				debounce_finished = true;
-				xil_printf("RIGHT button pressed. #: %d\r\n", counter++);
-				// Output indexed PPM Frame channel values to axi_ppm.
-				xil_printf("Frame Replayed @ index: %d\r\n", replay_index);
-				// Channel 1
-				*slv_reg8 = record[replay_index][0];
-				// Channel 2
-				*slv_reg9 = record[replay_index][1];
-				// Channel 3
-				*slv_reg10 = record[replay_index][2];
-				// Channel 4
-				*slv_reg11 = record[replay_index][3];
-				// Channel 5
-				*slv_reg12 = record[replay_index][4];
-				// Channel 6
-				*slv_reg13 = record[replay_index][5];
+			xil_printf("RIGHT button pressed. #: %d\r\n", counter++);
+			// Output indexed PPM Frame channel values to axi_ppm.
+			xil_printf("Frame Replayed @ index: %d\r\n", replay_index);
+			// Channel 1
+			*slv_reg8 = record[replay_index][0];
+			// Channel 2
+			*slv_reg9 = record[replay_index][1];
+			// Channel 3
+			*slv_reg10 = record[replay_index][2];
+			// Channel 4
+			*slv_reg11 = record[replay_index][3];
+			// Channel 5
+			*slv_reg12 = record[replay_index][4];
+			// Channel 6
+			*slv_reg13 = record[replay_index][5];
 
-				// Array boundary detection. Checks if next move will cause out-of-bounds error.
-				if(!((replay_index + 1) > MAX_FRAMES_TO_RECORD))
-				{
-					// Array will be inbounds.
-					replay_index++;
-				}
+			// Array boundary detection. Checks if next move will cause out-of-bounds error.
+			if(!((replay_index + 1) > MAX_FRAMES_TO_RECORD))
+			{
+				// Array will be inbounds.
+				replay_index++;
 			}
 		}
 		// Decrement the current play index.
 		if(*btn_ptr & BTN_LEFT)
 		{
-			// A button has been pressed.
-			button_flag = true;
-			// The debounce counter has yet to hit the needed cycles. 
-			if(debounce_counter < debounce_threshold)
+			xil_printf("LEFT button pressed. #: %d\r\n", counter++);
+			// Array boundary detection. Checks if next move will cause out-of-bounds error.
+			if(!((replay_index - 1) < 0))
 			{
-				debounce_counter++;
-				// Signals the a button has started the debounce process.
-				debounce_finished = false;
-			}
-			// Enough cycles have passed of constant button press && this button's functions
-			// have yet to be executed for this press.
-			else if((debounce_counter >= debounce_threshold) && (debounce_finished != true))
-			{
-				// Debounce process finished.
-				debounce_finished = true;
-				xil_printf("LEFT button pressed. #: %d\r\n", counter++);
-				// Array boundary detection. Checks if next move will cause out-of-bounds error.
-				if(!((replay_index - 1) < 0))
-				{
-					// Array will be inbounds.
-					replay_index--;
-					xil_printf("Replay index decremented to: %d\r\n", replay_index);
-				}
+				// Array will be inbounds.
+				replay_index--;
+				xil_printf("Replay index decremented to: %d\r\n", replay_index);
 			}
 		}
 	}
