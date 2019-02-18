@@ -21,14 +21,17 @@
 #define SW_1       0x02
 #define SW_2       0x04
 #define SW_3       0x08
-#define SW_4	   0x10 // Unconfirmed
+#define SW_4	   0x10
+#define SW_5	   0x20
+#define SW_6	   0x40
+#define SW_7	   0x80
 
 // BUTTON bitmasks.
 #define BTN_CENTER 0x01
 #define BTN_DOWN   0x02
 #define BTN_LEFT   0x04
 #define BTN_RIGHT  0x08
-#define BTN_UP     0x10  // Unconfirmed
+#define BTN_UP     0x10
 
 // Used in the record array to store PPM frames w/ their channel values.
 // 3,000 frames = 1 minute (1 min / 20ms = 3000 frames per second)
@@ -132,6 +135,6 @@ void record_mode_handler();
 // Replays the PPM Frame values to the axi_ppm.
 void replay_mode_handler();
 // Verifies all values being sent to the drone.
-void filter_mode_handler();
+void filter_mode_handler(uint32_t ch1, uint32_t ch2, uint32_t ch3, uint32_t ch4, uint32_t ch5, uint32_t ch6);
 // Checks min and max values of each PPM channel.
-void channel_boundary_correction();
+void channel_boundary_correction(uint32_t ch1, uint32_t ch2, uint32_t ch3, uint32_t ch4, uint32_t ch5, uint32_t ch6);

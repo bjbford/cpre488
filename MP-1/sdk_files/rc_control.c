@@ -33,8 +33,6 @@ int main()
 			debug_mode_handler();
 			// Records & rewinds the current PPM capture.
 			record_mode_handler();
-			// Verifies all values being sent to the drone.
-			filter_mode_handler();
 			// Replays the PPM Frame values to the axi_ppm.
 			replay_mode_handler();
 
@@ -177,6 +175,16 @@ void check_inputs()
 		filter_mode = FILTER_NONE;
 	}
 
+    /************ SWITCH 7 ************/
+
+	// Checks for valid SWITCH 7.
+	if(*sw_ptr & SW_7)
+	{
+		//reset record array
+		frame_index = 0;
+		replay_index = 0;
+		xil_printf("\nReset record array.\r\n");
+	}
 }
 
 
@@ -328,19 +336,31 @@ void replay_mode_handler()
 //				xil_printf("RIGHT button pressed. #: %d\r\n", counter++);
 				// Output indexed PPM Frame channel values to axi_ppm.
 				xil_printf("Frame Replayed @ index: %d\r\n", replay_index);
-				// Channel 1
-				*slv_reg8 = record[replay_index][0];
-				// Channel 2
-				*slv_reg9 = record[replay_index][1];
-				// Channel 3
-				*slv_reg10 = record[replay_index][2];
-				// Channel 4
-				*slv_reg11 = record[replay_index][3];
-				// Channel 5
-				*slv_reg12 = record[replay_index][4];
-				// Channel 6
-				*slv_reg13 = record[replay_index][5];
-
+				if(filter_mode == FILTER)
+				{
+					// Verifies all values being sent to the drone.
+					filter_mode_handler(record[replay_index][0],
+										record[replay_index][1],
+										record[replay_index][2],
+										record[replay_index][3],
+										record[replay_index][4],
+										record[replay_index][5]);
+				}
+				else
+				{
+					// Channel 1
+					*slv_reg8 = record[replay_index][0];
+					// Channel 2
+					*slv_reg9 = record[replay_index][1];
+					// Channel 3
+					*slv_reg10 = record[replay_index][2];
+					// Channel 4
+					*slv_reg11 = record[replay_index][3];
+					// Channel 5
+					*slv_reg12 = record[replay_index][4];
+					// Channel 6
+					*slv_reg13 = record[replay_index][5];
+				}
 				// Array boundary detection. Checks if next move will cause out-of-bounds error.
 				if(!((replay_index + 1) > MAX_FRAMES_TO_RECORD))
 				{
@@ -370,13 +390,13 @@ void replay_mode_handler()
  * to ensure they will not put the craft in an unstable
  * position.
  */
-void filter_mode_handler()
+void filter_mode_handler(uint32_t ch1, uint32_t ch2, uint32_t ch3, uint32_t ch4, uint32_t ch5, uint32_t ch6)
 {
 	// Software Filter Mode active.
 	if(filter_mode == FILTER)
 	{
 		// Ensures channel width value is within its min and max values.
-		channel_boundary_correction();
+		channel_boundary_correction(ch1, ch2, ch3, ch4, ch5, ch6);
 	}
 }
 
@@ -384,7 +404,7 @@ void filter_mode_handler()
 /**
  * Ensures each channel's width are within its specified min and max values.
  */
-void channel_boundary_correction()
+void channel_boundary_correction(uint32_t ch1, uint32_t ch2, uint32_t ch3, uint32_t ch4, uint32_t ch5, uint32_t ch6)
 {
 	// Ensure that value of each channel is between its min and max.
 	//
@@ -426,109 +446,91 @@ void channel_boundary_correction()
 	#define CHANNEL_6_MAX 162500
 
 	xil_printf("Before Filter\r\n");
-	xil_printf("Ch 1: %6d    Ch 2: %6d    Ch 3: %6d    Ch 4: %6d    Ch 5: %6d    Ch 6: %6d \r\n", *slv_reg2, *slv_reg3, *slv_reg4, *slv_reg5, *slv_reg6, *slv_reg7);
+	xil_printf("Ch 1: %6d    Ch 2: %6d    Ch 3: %6d    Ch 4: %6d    Ch 5: %6d    Ch 6: %6d \r\n", ch1, ch2, ch3, ch4, ch5, ch6);
 
 	/************ CHANNEL 1 ************/
 
 	// Checks for out-of-bounds Channel 1 width.
 	// Adjusts to nearest acceptable boundary if beyond limit.
-	if(*slv_reg2 < CHANNEL_1_MIN)
+	if(ch1 < CHANNEL_1_MIN)
 	{
-		*slv_reg8 = CHANNEL_1_MIN;
+		ch1 = CHANNEL_1_MIN;
 	}
 	else if(*slv_reg2 > CHANNEL_1_MAX)
 	{
-		*slv_reg8 = CHANNEL_1_MAX;
+		ch1 = CHANNEL_1_MAX;
 	}
-	else
-	{
-		*slv_reg8 = *slv_reg2;
-	}
+	*slv_reg8 = ch1;
 
 	/************ CHANNEL 2 ************/
 
 	// Checks for out-of-bounds Channel 2 width.
 	// Adjusts to nearest acceptable boundary if beyond limit
-	if(*slv_reg3 < CHANNEL_2_MIN)
+	if(ch2 < CHANNEL_2_MIN)
 	{
-		*slv_reg9 = CHANNEL_2_MIN;
+		ch2 = CHANNEL_2_MIN;
 	}
-	else if(*slv_reg3 > CHANNEL_2_MAX)
+	else if(ch2 > CHANNEL_2_MAX)
 	{
-		*slv_reg9 = CHANNEL_2_MAX;
+		ch2 = CHANNEL_2_MAX;
 	}
-	else
-	{
-		*slv_reg9 = *slv_reg3;
-	}
+	*slv_reg9 = ch2;
 
 	/************ CHANNEL 3 ************/
 
 	// Checks for out-of-bounds Channel 3 width.
 	// Adjusts to nearest acceptable boundary if beyond limit.
-	if(*slv_reg4 < CHANNEL_3_MIN)
+	if(ch3 < CHANNEL_3_MIN)
 	{
-		*slv_reg10 = CHANNEL_3_MIN;
+		ch3 = CHANNEL_3_MIN;
 	}
-	else if(*slv_reg4 > CHANNEL_3_MAX)
+	else if(ch3 > CHANNEL_3_MAX)
 	{
-		*slv_reg10 = CHANNEL_3_MAX;
+		ch3 = CHANNEL_3_MAX;
 	}
-	else
-	{
-		*slv_reg10 = *slv_reg4;
-	}
+	*slv_reg10 = ch3;
 
 	/************ CHANNEL 4 ************/
 
 	// Checks for out-of-bounds Channel 4 width.
 	// Adjusts to nearest acceptable boundary if beyond limit.
-	if(*slv_reg5 < CHANNEL_4_MIN)
+	if(ch4 < CHANNEL_4_MIN)
 	{
-		*slv_reg11 = CHANNEL_4_MIN;
+		ch4 = CHANNEL_4_MIN;
 	}
-	else if(*slv_reg5 > CHANNEL_4_MAX)
+	else if(ch4 > CHANNEL_4_MAX)
 	{
-		*slv_reg11 = CHANNEL_4_MAX;
+		ch4 = CHANNEL_4_MAX;
 	}
-	else
-	{
-		*slv_reg11 = *slv_reg5;
-	}
+	*slv_reg11 = ch4;
 
 	/************ CHANNEL 5 ************/
 
 	// Checks for out-of-bounds Channel 5 width.
 	// Adjusts to nearest acceptable boundary if beyond limit.
-	if(*slv_reg6 < CHANNEL_5_MIN)
+	if(ch5 < CHANNEL_5_MIN)
 	{
-		*slv_reg12 = CHANNEL_5_MIN;
+		ch5 = CHANNEL_5_MIN;
 	}
-	else if(*slv_reg6 > CHANNEL_5_MAX)
+	else if(ch5 > CHANNEL_5_MAX)
 	{
-		*slv_reg12 = CHANNEL_5_MAX;
+		ch5 = CHANNEL_5_MAX;
 	}
-	else
-	{
-		*slv_reg12 = *slv_reg6;
-	}
+	*slv_reg12 = ch5;
 
 	/************ CHANNEL 6 ************/
 
 	// Checks for out-of-bounds Channel 6 width.
 	// Adjusts to nearest acceptable boundary if beyond limit.
-	if(*slv_reg7 < CHANNEL_6_MIN)
+	if(ch6 < CHANNEL_6_MIN)
 	{
-		*slv_reg13 = CHANNEL_6_MIN;
+		ch6 = CHANNEL_6_MIN;
 	}
-	else if(*slv_reg7 > CHANNEL_6_MAX)
+	else if(ch6 > CHANNEL_6_MAX)
 	{
-		*slv_reg13 = CHANNEL_6_MAX;
+		ch6 = CHANNEL_6_MAX;
 	}
-	else
-	{
-		*slv_reg13 = *slv_reg7;
-	}
+	*slv_reg13 = ch6;
 
 	xil_printf("After Filter\r\n");
 	xil_printf("Ch 1: %6d    Ch 2: %6d    Ch 3: %6d    Ch 4: %6d    Ch 5: %6d    Ch 6: %6d \r\n", *slv_reg8, *slv_reg9, *slv_reg10, *slv_reg11, *slv_reg12, *slv_reg13);
