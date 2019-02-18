@@ -31,7 +31,7 @@
 #define BTN_UP     0x10  // Unconfirmed
 
 // Used in the record array to store PPM frames w/ their channel values.
-// 3,000 frames = 1 second (1 min / 20ms = 3000 frames per second)
+// 3,000 frames = 1 minute (1 min / 20ms = 3000 frames per second)
 #define MAX_FRAMES_TO_RECORD 3000
 // Holds the 32 bit offset between slave registers.
 #define register_offset 0x4

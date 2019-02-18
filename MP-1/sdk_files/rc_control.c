@@ -107,26 +107,10 @@ void check_inputs()
 	// Checks for valid BUTTON Center.
 	if(*btn_ptr & BTN_CENTER)
 	{
-		// A button has been pressed.
-		button_flag = true;
-		// The debounce counter has yet to hit the needed cycles. 
-		if(debounce_counter < debounce_threshold)
-		{
-			debounce_counter++;
-			// Signals the a button has started the debounce process.
-			debounce_finished = false;
-		}
-		// Enough cycles have passed of constant button press && this button's functions
-		// have yet to be executed for this press.
-		else if((debounce_counter >= debounce_threshold) && (debounce_finished != true))
-		{
-			// Debounce process finished.
-			debounce_finished = true;
-			xil_printf("Center button pressed. #: %d\r\n", counter++);
-			// Center button press detected.
-			// Exit application flag set.
-			exit_flag = true;
-		}
+		xil_printf("Center button pressed. #: %d\r\n", counter++);
+		// Center button press detected.
+		// Exit application flag set.
+		exit_flag = true;
 	}
 
 	/************ SWITCH 1 ************/
@@ -269,7 +253,7 @@ void record_mode_handler()
 		// Stores next PPM Frame w/ channel vaues in array and increments Frame index.
 		if(*btn_ptr & BTN_DOWN)
 		{
-			xil_printf("Down button pressed. #: %d\r\n", counter++);
+//			xil_printf("Down button pressed. #: %d\r\n", counter++);
 			xil_printf("Frame Recorded @ index: %d\r\n", frame_index);
 			// Store values.
 			// Channel 1 Value
@@ -290,12 +274,14 @@ void record_mode_handler()
 			{
 				// Increments the frame index.
 				frame_index++;
+				// Recorded frames have been changed. Reset Replay index.
+				replay_index = 0;
 			}
 		}
 		// Rewinds the recording by decrementing array index.
 		if(*btn_ptr & BTN_UP)
 		{
-			xil_printf("UP button pressed. #: %d\r\n", counter++);
+//			xil_printf("UP button pressed. #: %d\r\n", counter++);
 			// Clear current Frame data.
 			// Channel 1 Value
 			record[frame_index][0] = 0;
@@ -315,6 +301,8 @@ void record_mode_handler()
 			{
 				// Moves left one column in the 2D array.
 				frame_index--;
+				// Recorded frames have been changed. Reset Replay index.
+				replay_index = 0;
 				xil_printf("Record index decremented to: %d\r\n", frame_index);
 			}
 		}
@@ -334,33 +322,37 @@ void replay_mode_handler()
 		// Transmits stored PPM values over axi_ppm.
 		if(*btn_ptr & BTN_RIGHT)
 		{
-			xil_printf("RIGHT button pressed. #: %d\r\n", counter++);
-			// Output indexed PPM Frame channel values to axi_ppm.
-			xil_printf("Frame Replayed @ index: %d\r\n", replay_index);
-			// Channel 1
-			*slv_reg8 = record[replay_index][0];
-			// Channel 2
-			*slv_reg9 = record[replay_index][1];
-			// Channel 3
-			*slv_reg10 = record[replay_index][2];
-			// Channel 4
-			*slv_reg11 = record[replay_index][3];
-			// Channel 5
-			*slv_reg12 = record[replay_index][4];
-			// Channel 6
-			*slv_reg13 = record[replay_index][5];
-
-			// Array boundary detection. Checks if next move will cause out-of-bounds error.
-			if(!((replay_index + 1) > MAX_FRAMES_TO_RECORD))
+			// Does not play frames that hold no data. (Unrecorded)
+			if(record[replay_index][0] != 0)
 			{
-				// Array will be inbounds.
-				replay_index++;
+//				xil_printf("RIGHT button pressed. #: %d\r\n", counter++);
+				// Output indexed PPM Frame channel values to axi_ppm.
+				xil_printf("Frame Replayed @ index: %d\r\n", replay_index);
+				// Channel 1
+				*slv_reg8 = record[replay_index][0];
+				// Channel 2
+				*slv_reg9 = record[replay_index][1];
+				// Channel 3
+				*slv_reg10 = record[replay_index][2];
+				// Channel 4
+				*slv_reg11 = record[replay_index][3];
+				// Channel 5
+				*slv_reg12 = record[replay_index][4];
+				// Channel 6
+				*slv_reg13 = record[replay_index][5];
+
+				// Array boundary detection. Checks if next move will cause out-of-bounds error.
+				if(!((replay_index + 1) > MAX_FRAMES_TO_RECORD))
+				{
+					// Array will be inbounds.
+					replay_index++;
+				}
 			}
 		}
 		// Decrement the current play index.
 		if(*btn_ptr & BTN_LEFT)
 		{
-			xil_printf("LEFT button pressed. #: %d\r\n", counter++);
+//			xil_printf("LEFT button pressed. #: %d\r\n", counter++);
 			// Array boundary detection. Checks if next move will cause out-of-bounds error.
 			if(!((replay_index - 1) < 0))
 			{
