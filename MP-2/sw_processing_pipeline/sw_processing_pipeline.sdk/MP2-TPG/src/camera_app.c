@@ -58,6 +58,20 @@ void camera_config_init(camera_config_t *config) {
     return;
 }
 
+uint8_t to8red(uint32_t data){
+	data &= 0x00FF0000;
+	return (uint8_t)(data >> 4);
+}
+
+uint8_t to8green(uint32_t data){
+	data &= 0x0000FF00;
+	return (uint8_t)(data >> 2);
+}
+
+uint8_t to8blue(uint32_t data){
+	data &= 0x000000FF;
+	return (uint8_t)(data);
+}
 
 // Main (SW) processing loop. Recommended to have an explicit exit condition
 void camera_loop(camera_config_t *config) {
@@ -93,11 +107,72 @@ void camera_loop(camera_config_t *config) {
 	xil_printf("Start processing 1000 frames!\r\n");
 	xil_printf("pS2MM_Mem = %X\n\r", pS2MM_Mem);
 	xil_printf("pMM2S_Mem = %X\n\r", pMM2S_Mem);
+	
+	uint8_t red = 0, green = 0, blue = 0, lastCb = 0, lastCr = 0, Y0 = 0;
 
 	// Run for 1000 frames before going back to HW mode
 	for (j = 0; j < 1000; j++) {
-		for (i = 0; i < 1920*1080; i++) {
+		//TODO : create bayer array
+		
+		//convert from bayer to normal
+		//convert from rgb to yuv
+		//convert from 4:4:4 to 4:2:2
+		for (i = 1; i < (1920*1080) - 1; i++) {
 //	       pMM2S_Mem[i] = 0x0A21; // 12-bit with 4-bit padding, 4-bit per color (all green screen)
+			//horizontal red/green row
+			if(((i / 1080) % 2) == 0){
+            
+				//green pixel
+				if (i % 2) == 1){
+					red = (to8red(bayer[i][j + 1]) + to8red(bayer[i][j - 1])) / 2;
+					green = to8green(bayer[i][j]);
+					blue = (to8blue(bayer[i + 1][j]) + to8blue(bayer[i - 1][j])) / 2;
+				}
+				
+				//red pixel
+				else{
+					red = to8red(bayer[i][j]);
+					green = (to8green(bayer[i][j + 1]) + to8green(bayer[i][j - 1]) + to8green(bayer[i + 1][j]) + to8green(bayer[i - 1][j])) / 4;
+					blue = (to8blue(bayer[i + 1][j + 1]) + to8blue(bayer[i - 1][j - 1]) + to8blue(bayer[i + 1][j - 1]) + to8blue(bayer[i - 1][j + 1])) / 4;
+				}
+			}
+				 
+			//horizontal blue/green row
+			else{
+				
+				//blue pixel
+				if ((i %  2) == 1){
+					red = (to8red(bayer[i + 1][j + 1]) + to8red(bayer[i - 1][j - 1]) + to8red(bayer[i + 1][j - 1]) + to8red(bayer[i - 1][j + 1])) / 4;
+					green = (to8green(bayer[i][j + 1]) + to8green(bayer[i][j - 1]) + to8green(bayer[i + 1][j]) + to8green(bayer[i - 1][j])) / 4;
+					blue = to8blue(bayer[i][j]);
+				}
+				//green pixel
+				else{
+					red = (to8red(bayer[i][j + 1]) + to8red(bayer[i][j - 1])) / 2;
+					green = to8green(bayer[i][j]);
+					blue = (to8blue(bayer[i + 1][j]) + to8blue(bayer[i - 1][j])) / 2;
+				}
+			}
+			
+			//rgb to yuv
+			double conversion[] = {{0.183, 0.614, 0.062}, {-0.101, -0.338, 0.439}, {0.439, -0.399, -0.04}};
+			uint32_t Cb = uint32_t(128 - (red * 0.101) - (green * 0.338) + (blue * 0.439));
+			uint32_t Cr = uint32_t(128 + (red * 0.439) - (green * 0.399) - (blue * 0.040));
+			uint32_t Y1 = uint32_t(16 + (red * 0.183) + (green * 0.614) + (blue * 0.062));
+			Cb = (Cb + lastCb) / 2;
+			Cr = (Cr + lastCr) / 2;
+			
+			//0xCrY0CbY1
+			if((i % 2) == 1){
+				xil_printf("Cr: %x  Y0: %x  Cb: %x  Y1: %x\n", Cr, Y0, Cb, Y1);
+				uint32_t final = (((uint32_t)(Cr) << 24) | ((uint32_t)(Y0) << 16) | ((uint32_t)(Cb) << 8) | ((uint32_t)(Y1)));
+				xil_printf("Final value: %x\n", final);
+			}
+			//write final to mem	
+			Y0 = Y1;
+			lastCb = Cb;
+			lastCr = Cr;
+			
 			pMM2S_Mem[i] = pS2MM_Mem[1920*1080-i-1];
 		}
 	}
