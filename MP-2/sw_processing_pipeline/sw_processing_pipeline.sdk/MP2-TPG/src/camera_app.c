@@ -197,3 +197,150 @@ void camera_loop(camera_config_t *config) {
 
 	return;
 }
+
+
+/**
+ * Oversees the capture and playback of captured image frames.
+ */
+void camera_interface()
+{
+	// New cycle. Reset needed status flags.
+	button_flag = false;
+	// Checks which buttons or switches are active.
+	check_inputs();
+	// Replays the PPM Frame values to the axi_ppm.
+	replay_mode_handler();
+	if(button_flag == false)
+	{
+		// Reset the counter used for button debouncing.
+		debounce_counter = 0;
+	}
+}
+
+
+/**
+ * Checks the register values for any active
+ * button or switch gpio lines.
+ */
+void check_inputs()
+{
+	/************ BUTTON Center ************/
+
+	// Checks for valid BUTTON Center.
+	if(*btn_ptr & BTN_CENTER)
+	{
+		// A button has been pressed.
+			button_flag = true;
+		// The debounce counter has yet to hit the needed cycles. 
+		if(debounce_counter < debounce_threshold)
+		{
+			debounce_counter++;
+			// Signals the a button has started the debounce process.
+			debounce_finished = false;
+		}
+		// Enough cycles have passed of constant button press && this button's functions
+		// have yet to be executed for this press.
+		else if((debounce_counter >= debounce_threshold) && (debounce_finished != true))
+		{
+			// Debounce process finished.
+			debounce_finished = true;
+			xil_printf("Center button pressed.");
+			// Capture and store the current image for 2 seconds.
+
+		}
+	}
+
+	/************ SWITCH 1 ************/
+
+    // Checks for valid SWITCH 1.
+    if(*sw_ptr & SW_1)
+    {
+    	// Register value 1 detected.
+    	// Switching to Replay Mode.
+    	replay_mode = REPLAY;
+	}
+	else
+	{
+		// Register value 0 detected.
+		// Switching out of replay Mode.
+		replay_mode = NONE;
+	}
+}
+
+
+/**
+ * BTN_RIGHT displays the next stored image from memory.
+ * BTN_LEFT decrements the play index & plays previous image.
+ */
+void replay_mode_handler()
+{
+	// Replay Mode active.
+	if(replay_mode == REPLAY)
+	{
+		// Increments the 'replay_index'. Plays the next image.
+		if(*btn_ptr & BTN_RIGHT)
+		{
+			// A button has been pressed.
+			button_flag = true;
+			// The debounce counter has yet to hit the needed cycles. 
+			if(debounce_counter < debounce_threshold)
+			{
+				debounce_counter++;
+				// Signals the a button has started the debounce process.
+				debounce_finished = false;
+			}
+			// Enough cycles have passed of constant button press && this button's functions
+			// have yet to be executed for this press.
+			else if((debounce_counter >= debounce_threshold) && (debounce_finished != true))
+			{
+				// Debounce process finished.
+				debounce_finished = true;
+				xil_printf("RIGHT button pressed.");
+				// Does not play frames that hold no data. (Unrecorded)
+				if(/* check for empty frame @ 'replay_index' */)
+				{
+					if(!((replay_index + 1) > MAX_FRAMES_TO_RECORD))
+					{
+						// Array will be inbounds.
+						replay_index++;
+						xil_printf("Frame Replayed @ index: %d\r\n", replay_index);
+						// Display frame @ current index.
+
+					}
+				}
+			}
+			
+		}
+		// Decrement the 'replay_index'. Plays the previous image.
+		if(*btn_ptr & BTN_LEFT)
+		{
+			// A button has been pressed.
+			button_flag = true;
+			// The debounce counter has yet to hit the needed cycles. 
+			if(debounce_counter < debounce_threshold)
+			{
+				debounce_counter++;
+				// Signals the a button has started the debounce process.
+				debounce_finished = false;
+			}
+			// Enough cycles have passed of constant button press && this button's functions
+			// have yet to be executed for this press.
+			else if((debounce_counter >= debounce_threshold) && (debounce_finished != true))
+			{
+				// Debounce process finished.
+				debounce_finished = true;
+				xil_printf("LEFT button pressed.");
+				// Array boundary detection. Checks if next move will cause out-of-bounds error.
+				if(!((replay_index - 1) < 0))
+				{
+					xil_printf("Replay index decremented to: %d\r\n", replay_index);
+					// Array will be inbounds.
+					replay_index--;
+					// Display frame @ current index.
+
+				}
+			}
+		}
+	}
+}
+	
