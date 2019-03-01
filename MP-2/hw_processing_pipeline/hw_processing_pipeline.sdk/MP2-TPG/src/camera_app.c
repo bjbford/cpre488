@@ -21,6 +21,11 @@
 
 camera_config_t camera_config;
 
+// Pointers to the S2MM memory frame and M2SS memory frame
+volatile Xuint16 *pS2MM_Mem;
+volatile Xuint16 *pMM2S_Mem;
+
+
 // Register address for the switch and button gpio ports.
 uint32_t *sw_ptr = XPAR_SWS_8BITS_BASEADDR;
 uint32_t *btn_ptr = XPAR_BTNS_5BITS_BASEADDR;
@@ -157,8 +162,8 @@ void camera_loop(camera_config_t *config) {
 
 
 	// Pointers to the S2MM memory frame and M2SS memory frame
-	volatile Xuint16 *pS2MM_Mem = (Xuint16 *)XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_S2MM_ADDR_OFFSET+XAXIVDMA_START_ADDR_OFFSET);
-	volatile Xuint16 *pMM2S_Mem = (Xuint16 *)XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_MM2S_ADDR_OFFSET+XAXIVDMA_START_ADDR_OFFSET+4);
+	pS2MM_Mem = (Xuint16 *)XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_S2MM_ADDR_OFFSET+XAXIVDMA_START_ADDR_OFFSET);
+	pMM2S_Mem = (Xuint16 *)XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_MM2S_ADDR_OFFSET+XAXIVDMA_START_ADDR_OFFSET+4);
 
 
 	xil_printf("Start processing 1000 frames!\r\n");
@@ -288,8 +293,6 @@ void camera_interface(camera_config_t *config)
  */
 void check_inputs(camera_config_t *config)
 {
-	volatile Xuint16 *pS2MM_Mem = (Xuint16 *)XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_S2MM_ADDR_OFFSET+XAXIVDMA_START_ADDR_OFFSET);
-	volatile Xuint16 *pMM2S_Mem = (Xuint16 *)XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_MM2S_ADDR_OFFSET+XAXIVDMA_START_ADDR_OFFSET+4);
 	/************ BUTTON Center ************/
 
 	// Checks for valid BUTTON Center.
@@ -375,8 +378,6 @@ void check_inputs(camera_config_t *config)
  */
 void replay_mode_handler(camera_config_t *config)
 {
-	volatile Xuint16 *pS2MM_Mem = (Xuint16 *)XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_S2MM_ADDR_OFFSET+XAXIVDMA_START_ADDR_OFFSET);
-	volatile Xuint16 *pMM2S_Mem = (Xuint16 *)XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_MM2S_ADDR_OFFSET+XAXIVDMA_START_ADDR_OFFSET+4);
 	// Replay Mode active.
 	if(replay_mode == REPLAY)
 	{
