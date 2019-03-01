@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <xil_printf.h>
 #include <sleep.h>
+#include <stdbool.h>
 #include "fmc_iic.h"
 #include "fmc_ipmi.h"
 #include "fmc_imageon.h"
@@ -132,16 +133,33 @@ uint32_t *btn_ptr = XPAR_BTNS_5BITS_BASEADDR;
 // Defines the max number of images the storage should hold.
 #define MAX_IMAGES_TO_RECORD 32
 
-// BUTTON bitmasks.
-#define BTN_CENTER 0x01
-#define BTN_LEFT   0x04
-#define BTN_RIGHT  0x08
-
 // SWITCH bitmasks.
 #define SW_0       0x01
+#define SW_1       0x02
+#define SW_2       0x04
+#define SW_3       0x08
+#define SW_4	   0x10
+#define SW_5	   0x20
+#define SW_6	   0x40
+#define SW_7	   0x80
+
+// BUTTON bitmasks.
+#define BTN_CENTER 0x01
+#define BTN_DOWN   0x02
+#define BTN_LEFT   0x04
+#define BTN_RIGHT  0x08
+#define BTN_UP     0x10
+
+// User given command to exit the program.
+// True = Yes
+// False = No
+bool exit_flag = false;
+
+// Array to hold the stored images.
+int images[1920*1080*MAX_IMAGES_TO_RECORD];
 
 // This index is used to store images.
-int frame_index = 0;
+int image_index = 0;
 
 // Used to switch between stored pictures.
 int replay_index = 0;

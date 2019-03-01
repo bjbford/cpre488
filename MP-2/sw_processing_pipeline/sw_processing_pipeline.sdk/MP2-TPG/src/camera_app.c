@@ -17,6 +17,7 @@
  *****************************************************************************/
 
 #include "camera_app.h"
+#include "platform.h"
 
 
 camera_config_t camera_config;
@@ -26,8 +27,14 @@ int main() {
 
 	camera_config_init(&camera_config);
 	fmc_imageon_enable(&camera_config);
-	camera_loop(&camera_config);
-
+	//camera_loop(&camera_config);
+	while(exit_flag == false)
+	{
+		camera_interface();
+	}
+	// From platform.c : Disables cache.
+	cleanup_platform();
+	// Exit command has been given.
 	return 0;
 }
 
@@ -222,6 +229,8 @@ void camera_interface()
  */
 void check_inputs()
 {
+	volatile Xuint16 *pS2MM_Mem = (Xuint16 *)XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_S2MM_ADDR_OFFSET+XAXIVDMA_START_ADDR_OFFSET);
+	volatile Xuint16 *pMM2S_Mem = (Xuint16 *)XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_MM2S_ADDR_OFFSET+XAXIVDMA_START_ADDR_OFFSET+4);
 	/************ BUTTON Center ************/
 
 	// Checks for valid BUTTON Center.
@@ -245,23 +254,27 @@ void check_inputs()
 			xil_printf("Center button pressed.");
 			// Capture and store the current image for 2 seconds.
 			xil_printf("Frame Recorded @ index: %d\r\n", frame_index);
-			// Store Frame
-
+			// Store image into memeory.
+			images[frame_index] = pS2MM_Mem;
+			// Flash image to screen.
+			pS2MM_Mem = images[image_index];
+			// Holds for 2 seconds.
+			sleep(2);
 			// Array boundary detection. Checks if next move will cause out-of-bounds error.
-			if(!((frame_index + 1) > MAX_IMAGES_TO_RECORD))
+			if(!((image_index + 1) > MAX_IMAGES_TO_RECORD))
 			{
 				// Increments the frame index.
-				frame_index++;
-				// Recorded frames have been changed. Reset Replay index.
+				image_index++;
+				// Recorded images have been changed. Reset Replay index.
 				replay_index = 0;
 			}
 		}
 	}
 
-	/************ SWITCH 1 ************/
+	/************ SWITCH 0 ************/
 
-    // Checks for valid SWITCH 1.
-    if(*sw_ptr & SW_1)
+    // Checks for valid SWITCH 0.
+    if(*sw_ptr & SW_0)
     {
     	// Register value 1 detected.
     	// Switching to Replay Mode.
@@ -273,6 +286,27 @@ void check_inputs()
 		// Switching out of replay Mode.
 		replay_mode = NONE;
 	}
+
+	/************ SWITCH 2 ************/
+
+	// Checks for valid SWITCH 2.
+    if(*sw_ptr & SW_2)
+    {
+    	xil_printf("Switch 2 activated");
+		// Exit application flag set.
+		exit_flag = true;
+	}
+
+	/************ SWITCH 7 ************/
+
+	// Checks for valid SWITCH 7.
+	if(*sw_ptr & SW_7)
+	{
+		//reset record array
+		image_index = 0;
+		replay_index = 0;
+		xil_printf("\nReset indexs.\r\n");
+	}
 }
 
 
@@ -282,6 +316,8 @@ void check_inputs()
  */
 void replay_mode_handler()
 {
+	volatile Xuint16 *pS2MM_Mem = (Xuint16 *)XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_S2MM_ADDR_OFFSET+XAXIVDMA_START_ADDR_OFFSET);
+	volatile Xuint16 *pMM2S_Mem = (Xuint16 *)XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_MM2S_ADDR_OFFSET+XAXIVDMA_START_ADDR_OFFSET+4);
 	// Replay Mode active.
 	if(replay_mode == REPLAY)
 	{
@@ -306,13 +342,13 @@ void replay_mode_handler()
 				xil_printf("RIGHT button pressed.");
 				
 				// Does not play indexs that hold no data. (Unrecorded)
-				if(/* check for empty frame @ 'replay_index' */)
+				if(pMM2S_Mem[replay_index] == 0)
 				{
-					// Pointers to the S2MM memory frame and M2SS memory frame
-					volatile Xuint16 *pMM2S_Mem = (Xuint16 *)XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_MM2S_ADDR_OFFSET+XAXIVDMA_START_ADDR_OFFSET+4);
-					xil_printf("Frame Replayed @ index: %d\r\n", replay_index);
+					// Pointers to the S2MM memory frame and M2SS memory frame.
+					xil_printf("Image Replayed @ index: %d\r\n", replay_index);
 					// Play stored array.
-					pMM2S_Mem = //register.
+					pMM2S_Mem = images[replay_index];
+					// Check for max images.
 					if(!((replay_index + 1) > MAX_IMAGES_TO_RECORD))
 					{
 						// Array will be inbounds.
@@ -348,7 +384,7 @@ void replay_mode_handler()
 					replay_index--;
 					xil_printf("Replay index decremented to: %d\r\n", replay_index);
 					// Display frame @ current index.
-
+					pMM2S_Mem = images[replay_index];
 				}
 			}
 		}
