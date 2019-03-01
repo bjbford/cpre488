@@ -129,8 +129,8 @@ struct struct_vres_timing_t {
 uint32_t *sw_ptr = XPAR_SWS_8BITS_BASEADDR;
 uint32_t *btn_ptr = XPAR_BTNS_5BITS_BASEADDR;
 
-// Defines the max number of frames the storage should hold.
-#define MAX_FRAMES_TO_RECORD 32
+// Defines the max number of images the storage should hold.
+#define MAX_IMAGES_TO_RECORD 32
 
 // BUTTON bitmasks.
 #define BTN_CENTER 0x01
@@ -139,6 +139,12 @@ uint32_t *btn_ptr = XPAR_BTNS_5BITS_BASEADDR;
 
 // SWITCH bitmasks.
 #define SW_0       0x01
+
+// This index is used to store images.
+int frame_index = 0;
+
+// Used to switch between stored pictures.
+int replay_index = 0;
 
 // Status of all button presses. True if one or more buttons are pressed.
 // False otherwise.

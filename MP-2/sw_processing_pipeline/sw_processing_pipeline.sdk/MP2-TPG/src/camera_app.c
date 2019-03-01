@@ -246,7 +246,17 @@ void check_inputs()
 			debounce_finished = true;
 			xil_printf("Center button pressed.");
 			// Capture and store the current image for 2 seconds.
+			xil_printf("Frame Recorded @ index: %d\r\n", frame_index);
+			// Store Frame
 
+			// Array boundary detection. Checks if next move will cause out-of-bounds error.
+			if(!((frame_index + 1) > MAX_IMAGES_TO_RECORD))
+			{
+				// Increments the frame index.
+				frame_index++;
+				// Recorded frames have been changed. Reset Replay index.
+				replay_index = 0;
+			}
 		}
 	}
 
@@ -296,16 +306,17 @@ void replay_mode_handler()
 				// Debounce process finished.
 				debounce_finished = true;
 				xil_printf("RIGHT button pressed.");
-				// Does not play frames that hold no data. (Unrecorded)
+				
+				// Does not play indexs that hold no data. (Unrecorded)
 				if(/* check for empty frame @ 'replay_index' */)
 				{
-					if(!((replay_index + 1) > MAX_FRAMES_TO_RECORD))
+					xil_printf("Frame Replayed @ index: %d\r\n", replay_index);
+					// Play stored array.
+
+					if(!((replay_index + 1) > MAX_IMAGES_TO_RECORD))
 					{
 						// Array will be inbounds.
 						replay_index++;
-						xil_printf("Frame Replayed @ index: %d\r\n", replay_index);
-						// Display frame @ current index.
-
 					}
 				}
 			}
@@ -333,9 +344,9 @@ void replay_mode_handler()
 				// Array boundary detection. Checks if next move will cause out-of-bounds error.
 				if(!((replay_index - 1) < 0))
 				{
-					xil_printf("Replay index decremented to: %d\r\n", replay_index);
 					// Array will be inbounds.
 					replay_index--;
+					xil_printf("Replay index decremented to: %d\r\n", replay_index);
 					// Display frame @ current index.
 
 				}
