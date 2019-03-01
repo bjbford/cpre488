@@ -27,13 +27,13 @@ int main() {
 
 	camera_config_init(&camera_config);
 	fmc_imageon_enable(&camera_config);
-	//camera_loop(&camera_config);
-	while(exit_flag == false)
-	{
-		camera_interface();
-	}
+	camera_loop(&camera_config);
+	//while(exit_flag == false)
+	//{
+	//	camera_interface();
+	//}
 	// From platform.c : Disables cache.
-	cleanup_platform();
+	//cleanup_platform();
 	// Exit command has been given.
 	return 0;
 }
@@ -50,7 +50,7 @@ void camera_config_init(camera_config_t *config) {
     config->uBaseAddr_VITA_CAM = XPAR_ONSEMI_VITA_CAM_0_S00_AXI_BASEADDR;  // Device for receiving Camera sensor data
 
     // Uncomment as Video Hardware pipeline IP cores are added
- 	config->uDeviceId_RGBYCC = XPAR_RGB2YCRCB_0_DEVICE_ID;
+ 	//config->uDeviceId_RGBYCC = XPAR_RGB2YCRCB_0_DEVICE_ID;
 
     // Uncomment when using the TPG for Video input
 //    config->uBaseAddr_TPG_PatternGenerator = XPAR_V_TPG_0_S_AXI_CTRL_BASEADDR; // TPG Device

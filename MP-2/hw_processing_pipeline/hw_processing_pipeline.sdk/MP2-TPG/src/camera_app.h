@@ -17,6 +17,7 @@
 
 #ifndef __CAMERA_APP_H__
 #define __CAMERA_APP_H__
+//#pragma once
 
 
 #include <xparameters.h>
@@ -24,16 +25,18 @@
 #include <stdlib.h>
 #include <xil_printf.h>
 #include <sleep.h>
+#include <stdbool.h>
 #include "fmc_iic.h"
 #include "fmc_ipmi.h"
 #include "fmc_imageon.h"
 #include "onsemi_vita_sw.h"
-//#include "xcfa.h"
-//#include "xrgb2ycrcb.h"
-//#include "xcresample.h"
+#include "xrgb2ycrcb.h"
+#include "xv_demosaic.h"
+#include "xvprocss.h"
 #include "xvtc.h"
 #include "xaxivdma.h"
 #include "xtpg_app.h"
+#include "platform.h"
 
 
 // Constants for library code
@@ -125,9 +128,15 @@ struct struct_vres_timing_t {
 }; typedef struct struct_vres_timing_t vres_timing_t;
 
 
+
+
+
 // Function prototypes (camera_app.c)
 void camera_config_init(camera_config_t *config);
 void camera_loop(camera_config_t *config);
+void camera_interface(camera_config_t *config);
+void check_inputs(camera_config_t *config);
+void replay_mode_handler(camera_config_t *config);
 
 // Function prototypes (fmc_imageon_utils.c)
 int fmc_imageon_enable(camera_config_t *config);

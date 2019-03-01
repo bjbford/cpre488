@@ -145,7 +145,7 @@ int fmc_imageon_enable( camera_config_t *config )
    // 0x Cr Y0 Cb Y1 (Y's could be flipped
    // Frame #1 - Red pixels
    for (i = 0; i < storage_size / config->uNumFrames_HdmiFrameBuffer; i += 4) {
-	  *pStorageMem++ = 0xF0525A52;  // Red
+	  *pStorageMem++ = 0x8E2E822D;  // Red
    }
    // Frame #2 - Green pixels
    for (i = 0; i < storage_size / config->uNumFrames_HdmiFrameBuffer; i += 4) {
@@ -203,7 +203,7 @@ int fmc_imageon_enable( camera_config_t *config )
 	   xil_printf("\r\n\n\nFMC_IMAGEON_ENABLE_VITA, attempt %d\r\n\n\n", vita_enable_attempt++);
 	   vita_enabled_error = fmc_imageon_enable_vita(config);
    } while(vita_enabled_error != 0);
-//   fmc_imageon_enable_ipipe(config);
+   fmc_imageon_enable_ipipe(config);
 
 
    // Output Video input source in Hardware mode for 10 seconds
@@ -350,37 +350,41 @@ int fmc_imageon_enable_vita( camera_config_t *config ) {
 
 int fmc_imageon_enable_ipipe( camera_config_t *config ) {
 
-//   XCresample Cresample;
-//   XCresample_Config *CRES_Config;
-//
-//   XRgb2YCrCb  XRgbInstance;
-//   XRgb2YCrCb_Config *RGBYCC_Config;
-//
-//   XCfa Cfa;
-//   XCfa_Config *CFA_Config;
-//
-//   xil_printf("Image Processing Pipeline (iPIPE) Initialization ...\n\r" );
-//
-//   CRES_Config = XCresample_LookupConfig(config->uDeviceId_CRES);
-//   XCresample_CfgInitialize(&Cresample, CRES_Config, CRES_Config->BaseAddress);
-//   XCresample_Enable(&Cresample);
-//   xil_printf("\tCresample done\r\n");
-//
-//   RGBYCC_Config = XRgb2YCrCb_LookupConfig(config->uDeviceId_RGBYCC);
-//   XRgb2YCrCb_CfgInitialize(&XRgbInstance, RGBYCC_Config, RGBYCC_Config->BaseAddress);
-//   XRgb2YCrCb_Enable(&XRgbInstance);
-//   xil_printf("\tRGB2YCrCb done\r\n");
-//
-//   CFA_Config = XCfa_LookupConfig(config->uDeviceId_CFA);
-//   XCfa_CfgInitialize(&Cfa, CFA_Config, CFA_Config->BaseAddress);
-//   XCfa_SetBayerPhase(&Cfa, XCFA_RGRG_COMBINATION);
-//   XCfa_RegUpdateEnable(&Cfa);
-//   XCfa_Enable(&Cfa);
-//   xil_printf("\tCFA done\r\n");
-//
-//
-//
-//   return 0;
+   xil_printf("Image Processing Pipeline (iPIPE) Initialization ...\n\r" );
+
+// Uncomment this when ready to use this core.
+   XRgb2YCrCb  XRgbInstance;
+   XRgb2YCrCb_Config *RGBYCC_Config;
+   RGBYCC_Config = XRgb2YCrCb_LookupConfig(config->uDeviceId_RGBYCC);
+   XRgb2YCrCb_CfgInitialize(&XRgbInstance, RGBYCC_Config, RGBYCC_Config->BaseAddress);
+   XRgb2YCrCb_Enable(&XRgbInstance);
+   xil_printf("\tRGB2YCrCb done\r\n");
+
+// TODO Add additional register calls here to fully configure the core. See IP documentation for register details.
+   // Set Active width to 1920
+   Xil_Out32((XPAR_XV_DEMOSAIC_0_S_AXI_CTRL_BASEADDR) + (XV_DEMOSAIC_CTRL_ADDR_HWREG_WIDTH_DATA), (u16)(0x780));
+   // Set Active height to 1080
+   Xil_Out32((XPAR_XV_DEMOSAIC_0_S_AXI_CTRL_BASEADDR) + (XV_DEMOSAIC_CTRL_ADDR_HWREG_HEIGHT_DATA), (u16)(0x438));
+   // Set Bayer Phase to 0: (0,0) is a red pixel on a red/green row
+   Xil_Out32((XPAR_XV_DEMOSAIC_0_S_AXI_CTRL_BASEADDR) + (XV_DEMOSAIC_CTRL_ADDR_HWREG_BAYER_PHASE_DATA), (u16)(0x00));
+   // Start, autorestart core
+   Xil_Out32((XPAR_XV_DEMOSAIC_0_S_AXI_CTRL_BASEADDR) + (XV_DEMOSAIC_CTRL_ADDR_AP_CTRL), (u32)(0x81));// 0b10000001 means start and freerun mode (page 16 in PG286)
+   xil_printf("\tDemosaic done\r\n");
+
+// TODO Add additional register calls here to fully configure the core. See IP documentation for register details.
+   // Set HwReg_width to 1920
+   Xil_Out32((XPAR_V_PROC_SS_0_BASEADDR) + (XV_HCRESAMPLER_CTRL_ADDR_HWREG_WIDTH_DATA), (u16)(0x780));
+   // Set HwReg_height to 1080
+   Xil_Out32((XPAR_V_PROC_SS_0_BASEADDR) + (XV_HCRESAMPLER_CTRL_ADDR_HWREG_HEIGHT_DATA), (u16)(0x438));
+   // Set HDMI input frame to 4:4:4
+   Xil_Out32((XPAR_V_PROC_SS_0_BASEADDR) + (XV_HCRESAMPLER_CTRL_ADDR_HWREG_INPUT_VIDEO_FORMAT_DATA), (u8)(0x01));
+   // Set HDMI output frame to 4:2:2
+   Xil_Out32((XPAR_V_PROC_SS_0_BASEADDR) + (XV_HCRESAMPLER_CTRL_ADDR_HWREG_OUTPUT_VIDEO_FORMAT_DATA), (u8)(0x02));
+   // Start, autorestart core
+   Xil_Out32((XPAR_V_PROC_SS_0_BASEADDR) + (XV_HCRESAMPLER_CTRL_ADDR_AP_CTRL), (u32)(0x81));
+   xil_printf("\tVideo Processing System done\r\n");
+
+   return 0;
 }
 
 

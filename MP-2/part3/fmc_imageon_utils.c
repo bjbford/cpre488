@@ -245,7 +245,7 @@ int fmc_imageon_enable_tpg( camera_config_t *config ) {
    // See TPG data sheet for configuring the TPG for other features
    TPG_Act_H[0]  = 0x438; // Active Height
    TPG_Act_W[0]  = 0x780; // Active Width
-   TPG_BGP[0]    = 0x0D;  // Background Pattern
+   TPG_BGP[0]    = 0x0B;  // Background Pattern
    TPG_FGP[0]    = 0x00;  // Foreground Pattern
    TPG_MS[0]     = 0x04;  // Motion Speed
    TPG_CF[0]     = 0x02;  // TPG Color Format
