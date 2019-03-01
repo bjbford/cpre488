@@ -255,9 +255,9 @@ void check_inputs()
 			// Capture and store the current image for 2 seconds.
 			xil_printf("Frame Recorded @ index: %d\r\n", frame_index);
 			// Store image into memeory.
-			images[frame_index] = pS2MM_Mem;
+			images[1920*1080*frame_index] = pS2MM_Mem;
 			// Flash image to screen.
-			pS2MM_Mem = images[image_index];
+			pS2MM_Mem = images[1920*1080*image_index];
 			// Holds for 2 seconds.
 			sleep(2);
 			// Array boundary detection. Checks if next move will cause out-of-bounds error.
@@ -347,7 +347,7 @@ void replay_mode_handler()
 					// Pointers to the S2MM memory frame and M2SS memory frame.
 					xil_printf("Image Replayed @ index: %d\r\n", replay_index);
 					// Play stored array.
-					pMM2S_Mem = images[replay_index];
+					pMM2S_Mem = images[1920*1080*replay_index];
 					// Check for max images.
 					if(!((replay_index + 1) > MAX_IMAGES_TO_RECORD))
 					{
@@ -384,7 +384,7 @@ void replay_mode_handler()
 					replay_index--;
 					xil_printf("Replay index decremented to: %d\r\n", replay_index);
 					// Display frame @ current index.
-					pMM2S_Mem = images[replay_index];
+					pMM2S_Mem = images[1920*1080*replay_index];
 				}
 			}
 		}
