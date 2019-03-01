@@ -86,6 +86,10 @@ int debounce_threshold = 10;
 enum Software_Replay {NONE, REPLAY};
 enum Software_Replay replay_mode = NONE;
 
+// Resolution of image.
+const int res = 1920 * 1080;
+
+
 // Main function. Initializes the devices and configures VDMA
 int main() {
 
@@ -131,7 +135,6 @@ uint8_t to8(Xuint16 data){
 	data &= 0x00FF;
 	return (uint8_t)(data);
 }
-const int res = 1920 * 1080;
 uint8_t bayer[1920 * 1080];
 
 
@@ -316,10 +319,13 @@ void check_inputs(camera_config_t *config)
 			xil_printf("Center button pressed.\r\n");
 			// Capture and store the current image for 2 seconds.
 			xil_printf("Frame Recorded @ index: %d\r\n", image_index);
-			// Store image into memeory.
-			images[1920*1080*image_index] = pS2MM_Mem;
+			// Pull the image into an array.
+			for (int i = 1920*1080*image_index; i < res; i++)
+				images[i] = pS2MM_Mem[i];
+
 			// Flash image to screen.
-			pS2MM_Mem = images[1920*1080*image_index];
+			for (int i = 1920*1080*image_index; i < res; i++)
+				pS2MM_Mem[i] = images[i];
 			// Holds for 2 seconds.
 			sleep(2);
 			// Array boundary detection. Checks if next move will cause out-of-bounds error.
@@ -407,7 +413,9 @@ void replay_mode_handler(camera_config_t *config)
 					// Pointers to the S2MM memory frame and M2SS memory frame.
 					xil_printf("Image Replayed @ index: %d\r\n", replay_index);
 					// Play stored array.
-					pMM2S_Mem = images[1920*1080*replay_index];
+					// Flash image to screen.
+					for (int i = 1920*1080*image_index; i < res; i++)
+						pS2MM_Mem[i] = images[i];
 					// Check for max images.
 					if(!((replay_index + 1) > MAX_IMAGES_TO_RECORD))
 					{
@@ -444,7 +452,9 @@ void replay_mode_handler(camera_config_t *config)
 					replay_index--;
 					xil_printf("Replay index decremented to: %d\r\n", replay_index);
 					// Display frame @ current index.
-					pMM2S_Mem = images[1920*1080*replay_index];
+					// Flash image to screen.
+					for (int i = 1920*1080*image_index; i < res; i++)
+						pS2MM_Mem[i] = images[i];
 				}
 			}
 		}
