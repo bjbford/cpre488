@@ -43,9 +43,7 @@ void camera_config_init(camera_config_t *config) {
     config->uBaseAddr_VITA_CAM = XPAR_ONSEMI_VITA_CAM_0_S00_AXI_BASEADDR;  // Device for receiving Camera sensor data
 
     // Uncomment as Video Hardware pipeline IP cores are added
-//    config->uDeviceId_CFA = XPAR_CFA_0_DEVICE_ID;
-//    config->uDeviceId_CRES = XPAR_CRESAMPLE_0_DEVICE_ID;
-//    config->uDeviceId_RGBYCC = XPAR_RGB2YCRCB_0_DEVICE_ID;
+ 	config->uDeviceId_RGBYCC = XPAR_RGB2YCRCB_0_DEVICE_ID;
 
     // Uncomment when using the TPG for Video input
 //    config->uBaseAddr_TPG_PatternGenerator = XPAR_V_TPG_0_S_AXI_CTRL_BASEADDR; // TPG Device
@@ -58,20 +56,13 @@ void camera_config_init(camera_config_t *config) {
     return;
 }
 
-uint8_t to8red(uint32_t data){
-	data &= 0x00FF0000;
-	return (uint8_t)(data >> 4);
-}
-
-uint8_t to8green(uint32_t data){
-	data &= 0x0000FF00;
-	return (uint8_t)(data >> 2);
-}
-
-uint8_t to8blue(uint32_t data){
-	data &= 0x000000FF;
+uint8_t to8(Xuint16 data){
+	data &= 0x00FF;
 	return (uint8_t)(data);
 }
+const int res = 1920 * 1080;
+uint8_t bayer[1920 * 1080];
+
 
 // Main (SW) processing loop. Recommended to have an explicit exit condition
 void camera_loop(camera_config_t *config) {
@@ -109,31 +100,34 @@ void camera_loop(camera_config_t *config) {
 	xil_printf("pMM2S_Mem = %X\n\r", pMM2S_Mem);
 	
 	uint8_t red = 0, green = 0, blue = 0, lastCb = 0, lastCr = 0, Y0 = 0;
+	//0x80DD
+
 
 	// Run for 1000 frames before going back to HW mode
 	for (j = 0; j < 1000; j++) {
-		//TODO : create bayer array
+		for (i = 0; i < res; i++)
+			bayer[i] = to8(pS2MM_Mem[i]);
 		
 		//convert from bayer to normal
 		//convert from rgb to yuv
 		//convert from 4:4:4 to 4:2:2
-		for (i = 1; i < (1920*1080) - 1; i++) {
+		for (i = 1; i < res - 1; i++) {
 //	       pMM2S_Mem[i] = 0x0A21; // 12-bit with 4-bit padding, 4-bit per color (all green screen)
 			//horizontal red/green row
-			if(((i / 1080) % 2) == 0){
+			if(((i / 1920) % 2) == 0){
             
 				//green pixel
-				if (i % 2) == 1){
-					red = (to8red(bayer[i][j + 1]) + to8red(bayer[i][j - 1])) / 2;
-					green = to8green(bayer[i][j]);
-					blue = (to8blue(bayer[i + 1][j]) + to8blue(bayer[i - 1][j])) / 2;
+				if ((i % 2) == 1){
+					red = (bayer[i + 1] + (bayer[i - 1])) / 2;
+					green = (bayer[i]);
+					blue = ((bayer[i + 1920]) + (bayer[i - 1920])) / 2;
 				}
 				
 				//red pixel
 				else{
-					red = to8red(bayer[i][j]);
-					green = (to8green(bayer[i][j + 1]) + to8green(bayer[i][j - 1]) + to8green(bayer[i + 1][j]) + to8green(bayer[i - 1][j])) / 4;
-					blue = (to8blue(bayer[i + 1][j + 1]) + to8blue(bayer[i - 1][j - 1]) + to8blue(bayer[i + 1][j - 1]) + to8blue(bayer[i - 1][j + 1])) / 4;
+					red = (bayer[i]);
+					green = ((bayer[i+ 1]) + (bayer[i - 1]) + (bayer[i + 1920]) + (bayer[i - 1920])) / 4;
+					blue = ((bayer[i + 1920 + 1]) + (bayer[i - 1920 - 1]) + (bayer[i + 1920 - 1]) + (bayer[i - 1920 + 1])) / 4;
 				}
 			}
 				 
@@ -141,41 +135,45 @@ void camera_loop(camera_config_t *config) {
 			else{
 				
 				//blue pixel
-				if ((i %  2) == 1){
-					red = (to8red(bayer[i + 1][j + 1]) + to8red(bayer[i - 1][j - 1]) + to8red(bayer[i + 1][j - 1]) + to8red(bayer[i - 1][j + 1])) / 4;
-					green = (to8green(bayer[i][j + 1]) + to8green(bayer[i][j - 1]) + to8green(bayer[i + 1][j]) + to8green(bayer[i - 1][j])) / 4;
-					blue = to8blue(bayer[i][j]);
+				if ((i % 2) == 1){
+					red = ((bayer[i + 1920 + 1]) + (bayer[i - 1920 - 1]) + (bayer[i + 1920 - 1]) + (bayer[i - 1920 + 1])) / 4;
+					green = ((bayer[i + 1]) + (bayer[i - 1]) + (bayer[i + 1920]) + (bayer[i - 1920])) / 4;
+					blue = (bayer[i]);
 				}
 				//green pixel
 				else{
-					red = (to8red(bayer[i][j + 1]) + to8red(bayer[i][j - 1])) / 2;
-					green = to8green(bayer[i][j]);
-					blue = (to8blue(bayer[i + 1][j]) + to8blue(bayer[i - 1][j])) / 2;
+					red = ((bayer[i + 1]) + (bayer[i - 1])) / 2;
+					green = (bayer[i]);
+					blue = ((bayer[i + 1920]) + (bayer[i - 1920])) / 2;
 				}
 			}
 			
 			//rgb to yuv
-			double conversion[] = {{0.183, 0.614, 0.062}, {-0.101, -0.338, 0.439}, {0.439, -0.399, -0.04}};
-			uint32_t Cb = uint32_t(128 - (red * 0.101) - (green * 0.338) + (blue * 0.439));
-			uint32_t Cr = uint32_t(128 + (red * 0.439) - (green * 0.399) - (blue * 0.040));
-			uint32_t Y1 = uint32_t(16 + (red * 0.183) + (green * 0.614) + (blue * 0.062));
+//			double conversion[] = {{0.183, 0.614, 0.062}, {-0.101, -0.338, 0.439}, {0.439, -0.399, -0.04}};
+			uint8_t Cb = (uint8_t)(128 + (((((int)red) * -101) - (((int)green) * 338) + (((int)blue) * 439)) / 1000));
+			uint8_t Cr = (uint8_t)(128 + (((((int)red) * 439) - (((int)green) * 399) - (((int)blue) * 40)) / 1000));
+			uint8_t Y1 = (uint8_t)(16 + (((((int)red) * 183) + (((int)green) * 614) + (((int)blue) * 62)) / 1000));
 			Cb = (Cb + lastCb) / 2;
 			Cr = (Cr + lastCr) / 2;
 			
 			//0xCrY0CbY1
 			if((i % 2) == 1){
-				xil_printf("Cr: %x  Y0: %x  Cb: %x  Y1: %x\n", Cr, Y0, Cb, Y1);
-				uint32_t final = (((uint32_t)(Cr) << 24) | ((uint32_t)(Y0) << 16) | ((uint32_t)(Cb) << 8) | ((uint32_t)(Y1)));
-				xil_printf("Final value: %x\n", final);
+				//xil_printf("Cr: %x  Y0: %x  Cb: %x  Y1: %x\r\n", Cr, Y0, Cb, Y1);
+				uint16_t final1 = (((uint16_t)(Cb) << 8) | ((uint16_t)(Y0)));
+				uint16_t final2 = (((uint16_t)(Cr) << 8) | ((uint16_t)(Y1)));
+				//xil_printf("Final value1: %x Final value2: %x\r\n", final1, final2);
+				pMM2S_Mem[i - 1] = final1;
+				pMM2S_Mem[i] = final2;
 			}
 			//write final to mem	
 			Y0 = Y1;
 			lastCb = Cb;
 			lastCr = Cr;
-			
-			pMM2S_Mem[i] = pS2MM_Mem[1920*1080-i-1];
+//			pMM2S_Mem[i] = pS2MM_Mem[1920*1080-i-1];
 		}
+		//xil_printf("loop %d\r\n", j);
 	}
+
 
 
 	// Grab the DMA Control Registers, and re-enable circular park mode.
@@ -310,9 +308,11 @@ void replay_mode_handler()
 				// Does not play indexs that hold no data. (Unrecorded)
 				if(/* check for empty frame @ 'replay_index' */)
 				{
+					// Pointers to the S2MM memory frame and M2SS memory frame
+					volatile Xuint16 *pMM2S_Mem = (Xuint16 *)XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_MM2S_ADDR_OFFSET+XAXIVDMA_START_ADDR_OFFSET+4);
 					xil_printf("Frame Replayed @ index: %d\r\n", replay_index);
 					// Play stored array.
-
+					pMM2S_Mem = //register.
 					if(!((replay_index + 1) > MAX_IMAGES_TO_RECORD))
 					{
 						// Array will be inbounds.
