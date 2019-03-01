@@ -320,12 +320,15 @@ void check_inputs(camera_config_t *config)
 			// Capture and store the current image for 2 seconds.
 			xil_printf("Frame Recorded @ index: %d\r\n", image_index);
 			// Pull the image into an array.
-			for (int i = 1920*1080*image_index; i < res; i++)
-				images[i] = pS2MM_Mem[i];
-
+			for (int i = 0; i < res; i++)
+			{
+				images[i+res*image_index] = pS2MM_Mem[i];
+			}
 			// Flash image to screen.
-			for (int i = 1920*1080*image_index; i < res; i++)
-				pS2MM_Mem[i] = images[i];
+			for (i = 0; i < res; i++)
+			{
+				pS2MM_Mem[i] = images[i+res*image_index];
+			}
 			// Holds for 2 seconds.
 			sleep(2);
 			// Array boundary detection. Checks if next move will cause out-of-bounds error.
@@ -414,8 +417,10 @@ void replay_mode_handler(camera_config_t *config)
 					xil_printf("Image Replayed @ index: %d\r\n", replay_index);
 					// Play stored array.
 					// Flash image to screen.
-					for (int i = 1920*1080*image_index; i < res; i++)
-						pS2MM_Mem[i] = images[i];
+					for (int i = 0; i < res; i++)
+					{
+						pS2MM_Mem[i] = images[i+res*image_index];
+					}	
 					// Check for max images.
 					if(!((replay_index + 1) > MAX_IMAGES_TO_RECORD))
 					{
@@ -453,8 +458,10 @@ void replay_mode_handler(camera_config_t *config)
 					xil_printf("Replay index decremented to: %d\r\n", replay_index);
 					// Display frame @ current index.
 					// Flash image to screen.
-					for (int i = 1920*1080*image_index; i < res; i++)
-						pS2MM_Mem[i] = images[i];
+					for (int i = 0; i < res; i++)
+					{
+						pS2MM_Mem[i] = images[i+res*image_index];
+					}
 				}
 			}
 		}
