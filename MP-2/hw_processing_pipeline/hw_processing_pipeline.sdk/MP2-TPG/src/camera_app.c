@@ -78,12 +78,14 @@ int debounce_counter = 0;
 // Amount that the debounce counter has to hit to execute the buttons funtions.
 int debounce_threshold = 10;
 
-// Replay mode to play back stored frames.
+// Plays back individual or groups of frames.
 // NONE     - No Replay allowed.
-// REPLAY   - BTN_RIGHT displays the next captured frame to the screen.
+// FRAME    - BTN_RIGHT displays the next captured frame to the screen.
 // 			  BTN_LEFT decrements the current picture index and
 //                     displays the previous picture..
-enum Software_Replay {NONE, REPLAY};
+// VIDEO    - BTN_UP displays all stored frames as a video.
+// 			  BTN_LEFT plays the stored frames backwards.
+enum Software_Replay {NONE, FRAME, VIDEO};
 enum Software_Replay replay_mode = NONE;
 
 // Resolution of image.
@@ -101,7 +103,7 @@ int main() {
 	//camera_loop(&camera_config);
 	while(exit_flag == false)
 	{
-		camera_interface(&camera_config);
+		camera_interface();
 	}
 	// From platform.c : Disables cache.
 	cleanup_platform();
@@ -252,14 +254,14 @@ uint8_t to8(Xuint16 data){
 /**
  * Oversees the capture and playback of captured image frames.
  */
-void camera_interface(camera_config_t *config)
+void camera_interface()
 {
 	// New cycle. Reset needed status flags.
 	button_flag = false;
 	// Checks which buttons or switches are active.
-	check_inputs(&camera_config);
-	// Replays the PPM Frame values to the axi_ppm.
-	replay_mode_handler(&camera_config);
+	check_inputs();
+	// Plays the stored images to the screen.
+	replay_mode_handler();
 	if(button_flag == false)
 	{
 		// Reset the counter used for button debouncing.
@@ -272,77 +274,49 @@ void camera_interface(camera_config_t *config)
  * Checks the register values for any active
  * button or switch gpio lines.
  */
-void check_inputs(camera_config_t *config)
+void check_inputs()
 {
 	/************ BUTTON Center ************/
 
 	// Checks for valid BUTTON Center.
 	if(*btn_ptr & BTN_CENTER)
 	{
-		// A button has been pressed.
-		button_flag = true;
-		// The debounce counter has yet to hit the needed cycles.
-		if(debounce_counter < debounce_threshold)
+		if(replay_mode == VIDEO)
 		{
-			debounce_counter++;
-			// Signals the a button has started the debounce process.
-			debounce_finished = false;
+			capture_video();
 		}
-		// Enough cycles have passed of constant button press && this button's functions
-		// have yet to be executed for this press.
-		else if((debounce_counter >= debounce_threshold) && (debounce_finished != true))
+		else
 		{
-			// Debounce process finished.
-			debounce_finished = true;
-			xil_printf("Center button pressed.\r\n");
-			// Capture and store the current image for 2 seconds.
-			xil_printf("Frame Recorded @ index: %d\r\n", image_index);
-			// Pull the image into an array.
-			int i;
-			for (i = 0; i < res; i++)
-			{
-				images[i+res*image_index] = pS2MM_Mem[i];
-			}
-			// Flash image to screen.
-			for (i = 0; i < res; i++)
-			{
-				pS2MM_Mem[i] = images[i+res*image_index];
-			}
-			// Holds for 2 seconds.
-			sleep(2);
-			// Array boundary detection. Checks if next move will cause out-of-bounds error.
-			if(!((image_index + 1) > MAX_IMAGES_TO_RECORD))
-			{
-				// Increments the frame index.
-				image_index++;
-				// Recorded images have been changed. Reset Replay index.
-				replay_index = 0;
-			}
+			capture_image();
 		}
 	}
 
-	/************ SWITCH 0 ************/
+	/************ SWITCH 1 & 2 ************/
 
-    // Checks for valid SWITCH 0.
+    // Checks for an active switch 0.
     if(*sw_ptr & SW_0)
     {
-    	// Register value 1 detected.
     	// Switching to Replay Mode.
-    	replay_mode = REPLAY;
+    	replay_mode = IMAGE;
+	}
+	// Checks for an active switch 1. 
+	else if (*sw_ptr & SW_1)
+	{
+    	// Switching to Video Mode.
+    	replay_mode = VIDEO;
 	}
 	else
 	{
-		// Register value 0 detected.
 		// Switching out of replay Mode.
 		replay_mode = NONE;
 	}
 
-	/************ SWITCH 2 ************/
+	/************ SWITCH 7 ************/
 
-	// Checks for valid SWITCH 2.
-    if(*sw_ptr & SW_2)
+	// Checks for valid SWITCH 7.
+    if(*sw_ptr & SW_7)
     {
-    	xil_printf("Switch 2 activated.\r\n");
+    	xil_printf("Switch 7 activated.\r\n");
 		// Exit application flag set.
 		exit_flag = true;
 	}
@@ -361,89 +335,217 @@ void check_inputs(camera_config_t *config)
 
 
 /**
- * BTN_RIGHT displays the next stored image from memory.
- * BTN_LEFT decrements the play index & plays previous image.
+ * Captures one image per button press.
  */
-void replay_mode_handler(camera_config_t *config)
+void capture_image()
 {
-	// Replay Mode active.
-	if(replay_mode == REPLAY)
+	// A button has been pressed.
+	button_flag = true;
+	// The debounce counter has yet to hit the needed cycles.
+	if(debounce_counter < debounce_threshold)
 	{
-		// Increments the 'replay_index'. Plays the next image.
-		if(*btn_ptr & BTN_RIGHT)
+		debounce_counter++;
+		// Signals the a button has started the debounce process.
+		debounce_finished = false;
+	}
+	// Enough cycles have passed of constant button press && this button's functions
+	// have yet to be executed for this press.
+	else if((debounce_counter >= debounce_threshold) && (debounce_finished != true))
+	{
+		// Debounce process finished.
+		debounce_finished = true;
+		xil_printf("Center button pressed.\r\n");
+		// Pull the image into an array.
+		store_image(image_index);
+		// Flash image to screen.
+		display_image(image_index);
+		// Holds for 2 seconds.
+		sleep(2);
+		// Array boundary detection. Checks if next move will cause out-of-bounds error.
+		if(!((image_index + 1) > MAX_IMAGES_TO_RECORD))
 		{
-			// A button has been pressed.
-			button_flag = true;
-			// The debounce counter has yet to hit the needed cycles.
-			if(debounce_counter < debounce_threshold)
-			{
-				debounce_counter++;
-				// Signals the a button has started the debounce process.
-				debounce_finished = false;
-			}
-			// Enough cycles have passed of constant button press && this button's functions
-			// have yet to be executed for this press.
-			else if((debounce_counter >= debounce_threshold) && (debounce_finished != true))
-			{
-				// Debounce process finished.
-				debounce_finished = true;
-				xil_printf("RIGHT button pressed.\r\n");
-
-				// Does not play indexes that hold no data. (Unrecorded)
-				if(/*images[res*replay_index] == 0*/ 1)
-				{
-					// Pointers to the S2MM memory frame and M2SS memory frame.
-					xil_printf("Image Replayed @ index: %d\r\n", replay_index);
-					// Play stored array.
-					// Flash image to screen.
-					for (int i = 0; i < res; i++)
-					{
-						pS2MM_Mem[i] = images[i+res*replay_index];
-					}
-					// Check for max images.
-					if(!((replay_index + 1) > MAX_IMAGES_TO_RECORD))
-					{
-						// Array will be inbounds.
-						replay_index++;
-					}
-				}
-			}
-
+			// Increments the frame index.
+			image_index++;
+			// Recorded images have been changed. Reset Replay index.
+			replay_index = 0;
 		}
-		// Decrement the 'replay_index'. Plays the previous image.
-		if(*btn_ptr & BTN_LEFT)
+	}
+}
+
+
+/**
+ * Stores a video without debouncing.
+ */
+void capture_video()
+{
+	// Pull the image into an array.
+	store_image(image_index);
+	// Array boundary detection. Checks if next move will cause out-of-bounds error.
+	if(!((image_index + 1) > MAX_IMAGES_TO_RECORD))
+	{
+		// Increments the frame index.
+		image_index++;
+		// Recorded images have been changed. Reset Replay index.
+		replay_index = 0;
+	}
+}
+
+
+/**
+ * 	Handles the logic to play back stored images.
+ */
+void replay_mode_handler()
+{
+	// Check for image mode.
+	if(replay_mode == IMAGE)
+	{
+		individual_image();
+	}
+	// Check for video mode.
+	else if(replay_mode == VIDEO)
+	{
+		video_playback();
+	}
+}
+
+
+/**
+ * Plays the current image. Buttons have no debouncing and
+ * therefore holding the button plays the images as a video.
+ */
+void video_playback()
+{
+	// Increments the 'replay_index'. Plays the next image.
+	if(*btn_ptr & BTN_UP)
+	{
+		xil_printf("UP button pressed.\r\n");
+		// Does not play indexes that hold no data. (Unrecorded)
+		if(replay_index <= image_index)
 		{
-			// A button has been pressed.
-			button_flag = true;
-			// The debounce counter has yet to hit the needed cycles.
-			if(debounce_counter < debounce_threshold)
+			// Play stored array.
+			// Flash image to screen.
+			display_image(replay_index);
+			// Check for max images.
+			if(!((replay_index + 1) > MAX_IMAGES_TO_RECORD))
 			{
-				debounce_counter++;
-				// Signals the a button has started the debounce process.
-				debounce_finished = false;
+				// Array will be inbounds. Increment.
+				replay_index++;
 			}
-			// Enough cycles have passed of constant button press && this button's functions
-			// have yet to be executed for this press.
-			else if((debounce_counter >= debounce_threshold) && (debounce_finished != true))
+		}
+	}
+	// Decrement the 'replay_index'. Plays the previous image.
+	if(*btn_ptr & BTN_DOWN)
+	{
+		xil_printf("DOWN button pressed.\r\n");
+		// Array boundary detection. Checks if next move will cause out-of-bounds error.
+		if(!((replay_index - 1) < 0))
+		{
+			// Array will be inbounds. Decrement.
+			replay_index--;
+			// Flash image to screen.
+			display_image(replay_index);
+		}
+	}
+}
+
+
+/** 
+ * Handles the logic to play back a single image at a time.
+ */
+void individual_image()
+{
+	// Increments the 'replay_index'. Plays the next image.
+	if(*btn_ptr & BTN_RIGHT)
+	{
+		// A button has been pressed.
+		button_flag = true;
+		// The debounce counter has yet to hit the needed cycles.
+		if(debounce_counter < debounce_threshold)
+		{
+			debounce_counter++;
+			// Signals the a button has started the debounce process.
+			debounce_finished = false;
+		}
+		// Enough cycles have passed of constant button press && this button's functions
+		// have yet to be executed for this press.
+		else if((debounce_counter >= debounce_threshold) && (debounce_finished != true))
+		{
+			// Debounce process finished.
+			debounce_finished = true;
+			xil_printf("RIGHT button pressed.\r\n");
+			// Does not play indexes that hold no data. (Unrecorded)
+			if(replay_index <= image_index)
 			{
-				// Debounce process finished.
-				debounce_finished = true;
-				xil_printf("LEFT button pressed.\r\n");
-				// Array boundary detection. Checks if next move will cause out-of-bounds error.
-				if(!((replay_index - 1) < 0))
+				// Play stored array.
+				// Flash image to screen.
+				display_image(replay_index);
+				// Check for max images.
+				if(!((replay_index + 1) > MAX_IMAGES_TO_RECORD))
 				{
-					// Array will be inbounds.
-					replay_index--;
-					xil_printf("Replay index decremented to: %d\r\n", replay_index);
-					// Display frame @ current index.
-					// Flash image to screen.
-					for (int i = 0; i < res; i++)
-					{
-						pS2MM_Mem[i] = images[i+res*replay_index];
-					}
+					// Array will be inbounds. Increment.
+					replay_index++;
 				}
+			}
+		}
+
+	}
+	// Decrement the 'replay_index'. Plays the previous image.
+	if(*btn_ptr & BTN_LEFT)
+	{
+		// A button has been pressed.
+		button_flag = true;
+		// The debounce counter has yet to hit the needed cycles.
+		if(debounce_counter < debounce_threshold)
+		{
+			debounce_counter++;
+			// Signals the a button has started the debounce process.
+			debounce_finished = false;
+		}
+		// Enough cycles have passed of constant button press && this button's functions
+		// have yet to be executed for this press.
+		else if((debounce_counter >= debounce_threshold) && (debounce_finished != true))
+		{
+			// Debounce process finished.
+			debounce_finished = true;
+			xil_printf("LEFT button pressed.\r\n");
+			// Array boundary detection. Checks if next move will cause out-of-bounds error.
+			if(!((replay_index - 1) < 0))
+			{
+				// Array will be inbounds. Decrement.
+				replay_index--;
+				// Flash image to screen.
+				display_image(replay_index);
 			}
 		}
 	}
 }
 
+
+/**
+ * Flashes the image stored at the current index to the screen.
+ */
+void display_image(int index)
+{
+	// Pointers to the S2MM memory frame and M2SS memory frame.
+	xil_printf("Replayed @ index: %d\r\n", index);
+	// Play stored array index.
+	for (int i = 0; i < res; i++)
+	{
+		pS2MM_Mem[i] = images[i+res*index];
+	}
+}
+
+
+/**
+ * Store the image at the passed in index.
+ */
+void store_image(int index)
+{
+	// Capture and store the current image for 2 seconds.
+	xil_printf("Stored @ index: %d\r\n", index);
+	// Play stored array index.
+	for (int i = 0; i < res; i++)
+	{
+		images[i+res*index] = pS2MM_Mem[i];
+	}
+}
