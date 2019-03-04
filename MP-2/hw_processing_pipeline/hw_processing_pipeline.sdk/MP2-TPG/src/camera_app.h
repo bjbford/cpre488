@@ -134,9 +134,15 @@ struct struct_vres_timing_t {
 // Function prototypes (camera_app.c)
 void camera_config_init(camera_config_t *config);
 void camera_loop(camera_config_t *config);
-void camera_interface(camera_config_t *config);
-void check_inputs(camera_config_t *config);
-void replay_mode_handler(camera_config_t *config);
+void camera_interface();
+void check_inputs();
+void capture_image();
+void capture_video();
+void replay_mode_handler();
+void video_playback();
+void individual_image();
+void display_image(int index);
+void store_image(int index);
 
 // Function prototypes (fmc_imageon_utils.c)
 int fmc_imageon_enable(camera_config_t *config);

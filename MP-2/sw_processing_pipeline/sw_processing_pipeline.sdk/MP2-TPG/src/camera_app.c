@@ -109,9 +109,10 @@ void camera_loop(camera_config_t *config) {
 	uint8_t red = 0, green = 0, blue = 0, lastCb = 0, lastCr = 0, Y0 = 0;
 	//0x80DD
 
+	time_t start = time(NULL);
 
 	// Run for 1000 frames before going back to HW mode
-	for (j = 0; j < 1000; j++) {
+	for (j = 0; j < 100; j++) {
 		for (i = 0; i < res; i++)
 			bayer[i] = to8(pS2MM_Mem[i]);
 		
@@ -160,14 +161,14 @@ void camera_loop(camera_config_t *config) {
 			uint8_t Cb = (uint8_t)(128 + (((((int)red) * -101) - (((int)green) * 338) + (((int)blue) * 439)) / 1000));
 			uint8_t Cr = (uint8_t)(128 + (((((int)red) * 439) - (((int)green) * 399) - (((int)blue) * 40)) / 1000));
 			uint8_t Y1 = (uint8_t)(16 + (((((int)red) * 183) + (((int)green) * 614) + (((int)blue) * 62)) / 1000));
-			Cb = (Cb + lastCb) / 2;
-			Cr = (Cr + lastCr) / 2;
+			uint16_t avgCb = ((uint16_t)Cb + (uint16_t)lastCb) / 2;
+			uint16_t avgCr = ((uint16_t)Cr + (uint16_t)lastCr) / 2;
 			
 			//0xCrY0CbY1
 			if((i % 2) == 1){
 				//xil_printf("Cr: %x  Y0: %x  Cb: %x  Y1: %x\r\n", Cr, Y0, Cb, Y1);
-				uint16_t final1 = (((uint16_t)(Cb) << 8) | ((uint16_t)(Y0)));
-				uint16_t final2 = (((uint16_t)(Cr) << 8) | ((uint16_t)(Y1)));
+				uint16_t final1 = (((uint16_t)(avgCb) << 8) | ((uint16_t)(Y0)));
+				uint16_t final2 = (((uint16_t)(avgCr) << 8) | ((uint16_t)(Y1)));
 				//xil_printf("Final value1: %x Final value2: %x\r\n", final1, final2);
 				pMM2S_Mem[i - 1] = final1;
 				pMM2S_Mem[i] = final2;
@@ -181,7 +182,7 @@ void camera_loop(camera_config_t *config) {
 		//xil_printf("loop %d\r\n", j);
 	}
 
-
+	xil_printf("FPS: %lf", (double)(100 / (time(NULL) - start)));
 
 	// Grab the DMA Control Registers, and re-enable circular park mode.
 	vdma_MM2S_DMACR = XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_TX_OFFSET+XAXIVDMA_CR_OFFSET);

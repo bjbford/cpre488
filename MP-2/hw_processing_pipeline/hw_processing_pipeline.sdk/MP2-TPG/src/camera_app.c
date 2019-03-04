@@ -25,7 +25,6 @@ camera_config_t camera_config;
 volatile Xuint16 *pS2MM_Mem;
 volatile Xuint16 *pMM2S_Mem;
 
-
 // Register address for the switch and button gpio ports.
 uint32_t *sw_ptr = XPAR_SWS_8BITS_BASEADDR;
 uint32_t *btn_ptr = XPAR_BTNS_5BITS_BASEADDR;
@@ -80,12 +79,12 @@ int debounce_threshold = 10;
 
 // Plays back individual or groups of frames.
 // NONE     - No Replay allowed.
-// FRAME    - BTN_RIGHT displays the next captured frame to the screen.
+// IMAGE    - BTN_RIGHT displays the next captured frame to the screen.
 // 			  BTN_LEFT decrements the current picture index and
 //                     displays the previous picture..
 // VIDEO    - BTN_UP displays all stored frames as a video.
 // 			  BTN_LEFT plays the stored frames backwards.
-enum Software_Replay {NONE, FRAME, VIDEO};
+enum Software_Replay {NONE, IMAGE, VIDEO};
 enum Software_Replay replay_mode = NONE;
 
 // Resolution of image.
@@ -103,7 +102,7 @@ int main() {
 	//camera_loop(&camera_config);
 	while(exit_flag == false)
 	{
-		camera_interface();
+		camera_interface(&camera_config);
 	}
 	// From platform.c : Disables cache.
 	cleanup_platform();
@@ -254,14 +253,17 @@ uint8_t to8(Xuint16 data){
 /**
  * Oversees the capture and playback of captured image frames.
  */
-void camera_interface()
+void camera_interface(camera_config_t *config)
 {
+	pS2MM_Mem = (Xuint16 *)XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_S2MM_ADDR_OFFSET+XAXIVDMA_START_ADDR_OFFSET);
+	pMM2S_Mem = (Xuint16 *)XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_MM2S_ADDR_OFFSET+XAXIVDMA_START_ADDR_OFFSET+4);
+
 	// New cycle. Reset needed status flags.
 	button_flag = false;
 	// Checks which buttons or switches are active.
-	check_inputs();
+	check_inputs(&camera_config);
 	// Plays the stored images to the screen.
-	replay_mode_handler();
+	replay_mode_handler(&camera_config);
 	if(button_flag == false)
 	{
 		// Reset the counter used for button debouncing.
@@ -274,7 +276,7 @@ void camera_interface()
  * Checks the register values for any active
  * button or switch gpio lines.
  */
-void check_inputs()
+void check_inputs(camera_config_t *config)
 {
 	/************ BUTTON Center ************/
 
@@ -287,7 +289,7 @@ void check_inputs()
 		}
 		else
 		{
-			capture_image();
+			capture_image(&camera_config);
 		}
 	}
 
@@ -357,10 +359,12 @@ void capture_image()
 		xil_printf("Center button pressed.\r\n");
 		// Pull the image into an array.
 		store_image(image_index);
+		disable_hardware();
 		// Flash image to screen.
 		display_image(image_index);
 		// Holds for 2 seconds.
 		sleep(2);
+		enable_hardware();
 		// Array boundary detection. Checks if next move will cause out-of-bounds error.
 		if(!((image_index + 1) > MAX_IMAGES_TO_RECORD))
 		{
@@ -394,7 +398,7 @@ void capture_video()
 /**
  * 	Handles the logic to play back stored images.
  */
-void replay_mode_handler()
+void replay_mode_handler(camera_config_t *config)
 {
 	// Check for image mode.
 	if(replay_mode == IMAGE)
@@ -413,14 +417,14 @@ void replay_mode_handler()
  * Plays the current image. Buttons have no debouncing and
  * therefore holding the button plays the images as a video.
  */
-void video_playback()
+void video_playback(camera_config_t *config)
 {
 	// Increments the 'replay_index'. Plays the next image.
 	if(*btn_ptr & BTN_UP)
 	{
 		xil_printf("UP button pressed.\r\n");
 		// Does not play indexes that hold no data. (Unrecorded)
-		if(replay_index <= image_index)
+		while(replay_index <= image_index)
 		{
 			// Play stored array.
 			// Flash image to screen.
@@ -431,20 +435,26 @@ void video_playback()
 				// Array will be inbounds. Increment.
 				replay_index++;
 			}
+			replay_index++;
 		}
 	}
 	// Decrement the 'replay_index'. Plays the previous image.
 	if(*btn_ptr & BTN_DOWN)
 	{
 		xil_printf("DOWN button pressed.\r\n");
-		// Array boundary detection. Checks if next move will cause out-of-bounds error.
-		if(!((replay_index - 1) < 0))
+		disable_hardware();
+		while(replay_index > 0)
 		{
-			// Array will be inbounds. Decrement.
-			replay_index--;
-			// Flash image to screen.
-			display_image(replay_index);
+			// Array boundary detection. Checks if next move will cause out-of-bounds error.
+			if(!((replay_index - 1) < 0))
+			{
+				// Array will be inbounds. Decrement.
+				replay_index--;
+				// Flash image to screen.
+				display_image(replay_index);
+			}
 		}
+		enable_hardware();
 	}
 }
 
@@ -473,7 +483,7 @@ void individual_image()
 			// Debounce process finished.
 			debounce_finished = true;
 			xil_printf("RIGHT button pressed.\r\n");
-			// Does not play indexes that hold no data. (Unrecorded)
+			// Do not play indexes that hold no data. (Unrecorded)
 			if(replay_index <= image_index)
 			{
 				// Play stored array.
@@ -526,13 +536,11 @@ void individual_image()
  */
 void display_image(int index)
 {
-	// Pointers to the S2MM memory frame and M2SS memory frame.
 	xil_printf("Replayed @ index: %d\r\n", index);
 	// Play stored array index.
-	for (int i = 0; i < res; i++)
-	{
-		pS2MM_Mem[i] = images[i+res*index];
-	}
+	size_t size = res*sizeof(uint16_t);
+	memcpy(&pS2MM_Mem, images[res*index], size);
+
 }
 
 
@@ -541,11 +549,47 @@ void display_image(int index)
  */
 void store_image(int index)
 {
-	// Capture and store the current image for 2 seconds.
+	// Capture and store the current image.
 	xil_printf("Stored @ index: %d\r\n", index);
-	// Play stored array index.
-	for (int i = 0; i < res; i++)
-	{
-		images[i+res*index] = pS2MM_Mem[i];
-	}
+	// Copy contents on image into memory.
+	size_t size = res*sizeof(uint16_t);
+	memcpy(&images[res*index], pS2MM_Mem, size);
+}
+
+
+/**
+ * Halts the hardware pipeline.
+ */
+void disable_hardware(camera_config_t *config)
+{
+	Xuint32 parkptr;
+	Xuint32 vdma_S2MM_DMACR, vdma_MM2S_DMACR;
+
+	// Grab the DMA parkptr, and update it to ensure that when parked, the S2MM side is on frame 0, and the MM2S side on frame 1
+	parkptr = XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_PARKPTR_OFFSET);
+	parkptr &= ~XAXIVDMA_PARKPTR_READREF_MASK;
+	parkptr &= ~XAXIVDMA_PARKPTR_WRTREF_MASK;
+	parkptr |= 0x1;
+	XAxiVdma_WriteReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_PARKPTR_OFFSET, parkptr);
+	// Grab the DMA Control Registers, and clear circular park mode.
+	vdma_MM2S_DMACR = XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_TX_OFFSET+XAXIVDMA_CR_OFFSET);
+	XAxiVdma_WriteReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_TX_OFFSET+XAXIVDMA_CR_OFFSET, vdma_MM2S_DMACR & ~XAXIVDMA_CR_TAIL_EN_MASK);
+	vdma_S2MM_DMACR = XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_RX_OFFSET+XAXIVDMA_CR_OFFSET);
+	XAxiVdma_WriteReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_RX_OFFSET+XAXIVDMA_CR_OFFSET, vdma_S2MM_DMACR & ~XAXIVDMA_CR_TAIL_EN_MASK);
+}
+
+
+/**
+ * Re-enables the hardware pipeline.
+ */
+void enable_hardware(camera_config_t *config)
+{
+	Xuint32 parkptr;
+	Xuint32 vdma_S2MM_DMACR, vdma_MM2S_DMACR;
+
+	// Grab the DMA Control Registers, and re-enable circular park mode.
+	vdma_MM2S_DMACR = XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_TX_OFFSET+XAXIVDMA_CR_OFFSET);
+	XAxiVdma_WriteReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_TX_OFFSET+XAXIVDMA_CR_OFFSET, vdma_MM2S_DMACR | XAXIVDMA_CR_TAIL_EN_MASK);
+	vdma_S2MM_DMACR = XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_RX_OFFSET+XAXIVDMA_CR_OFFSET);
+	XAxiVdma_WriteReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_RX_OFFSET+XAXIVDMA_CR_OFFSET, vdma_S2MM_DMACR | XAXIVDMA_CR_TAIL_EN_MASK);
 }
