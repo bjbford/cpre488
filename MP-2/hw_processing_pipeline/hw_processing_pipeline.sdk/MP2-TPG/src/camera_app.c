@@ -339,7 +339,7 @@ void check_inputs(camera_config_t *config)
 /**
  * Captures one image per button press.
  */
-void capture_image()
+void capture_image(camera_config_t *config)
 {
 	// A button has been pressed.
 	button_flag = true;
@@ -359,12 +359,12 @@ void capture_image()
 		xil_printf("Center button pressed.\r\n");
 		// Pull the image into an array.
 		store_image(image_index);
-		disable_hardware();
+		disable_hardware(&camera_config);
 		// Flash image to screen.
 		display_image(image_index);
 		// Holds for 2 seconds.
 		sleep(2);
-		enable_hardware();
+		enable_hardware(&camera_config);
 		// Array boundary detection. Checks if next move will cause out-of-bounds error.
 		if(!((image_index + 1) > MAX_IMAGES_TO_RECORD))
 		{
@@ -442,7 +442,7 @@ void video_playback(camera_config_t *config)
 	if(*btn_ptr & BTN_DOWN)
 	{
 		xil_printf("DOWN button pressed.\r\n");
-		disable_hardware();
+		disable_hardware(&camera_config);
 		while(replay_index > 0)
 		{
 			// Array boundary detection. Checks if next move will cause out-of-bounds error.
@@ -454,7 +454,7 @@ void video_playback(camera_config_t *config)
 				display_image(replay_index);
 			}
 		}
-		enable_hardware();
+		enable_hardware(&camera_config);
 	}
 }
 
@@ -539,7 +539,7 @@ void display_image(int index)
 	xil_printf("Replayed @ index: %d\r\n", index);
 	// Play stored array index.
 	size_t size = res*sizeof(uint16_t);
-	memcpy(&pS2MM_Mem, images[res*index], size);
+	memcpy(pMM2S_Mem, &images[res*index], size);
 
 }
 
@@ -564,7 +564,6 @@ void disable_hardware(camera_config_t *config)
 {
 	Xuint32 parkptr;
 	Xuint32 vdma_S2MM_DMACR, vdma_MM2S_DMACR;
-
 	// Grab the DMA parkptr, and update it to ensure that when parked, the S2MM side is on frame 0, and the MM2S side on frame 1
 	parkptr = XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_PARKPTR_OFFSET);
 	parkptr &= ~XAXIVDMA_PARKPTR_READREF_MASK;
@@ -584,9 +583,7 @@ void disable_hardware(camera_config_t *config)
  */
 void enable_hardware(camera_config_t *config)
 {
-	Xuint32 parkptr;
 	Xuint32 vdma_S2MM_DMACR, vdma_MM2S_DMACR;
-
 	// Grab the DMA Control Registers, and re-enable circular park mode.
 	vdma_MM2S_DMACR = XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_TX_OFFSET+XAXIVDMA_CR_OFFSET);
 	XAxiVdma_WriteReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_TX_OFFSET+XAXIVDMA_CR_OFFSET, vdma_MM2S_DMACR | XAXIVDMA_CR_TAIL_EN_MASK);
