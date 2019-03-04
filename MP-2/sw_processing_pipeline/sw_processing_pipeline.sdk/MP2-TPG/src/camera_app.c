@@ -109,7 +109,10 @@ void camera_loop(camera_config_t *config) {
 	uint8_t red = 0, green = 0, blue = 0, lastCb = 0, lastCr = 0, Y0 = 0;
 	//0x80DD
 
-	time_t start = time(NULL);
+	// u64's for FPS computation
+	XTime tStart, tEnd;
+	// Start time
+	XTime_GetTime(&tStart);
 
 	// Run for 1000 frames before going back to HW mode
 	for (j = 0; j < 100; j++) {
@@ -182,7 +185,12 @@ void camera_loop(camera_config_t *config) {
 		//xil_printf("loop %d\r\n", j);
 	}
 
-	xil_printf("FPS: %lf", (double)(100 / (time(NULL) - start)));
+	// End time
+	XTime_GetTime(&tEnd);
+	// Compute time: from https://0xstubs.org/measuring-time-in-a-bare-metal-zynq-application/
+	// Compute fps
+	double fps = 100.0 / (((tEnd - tStart)*COUNTS_PER_SECOND));
+	printf("FPS: %lf", fps);
 
 	// Grab the DMA Control Registers, and re-enable circular park mode.
 	vdma_MM2S_DMACR = XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_TX_OFFSET+XAXIVDMA_CR_OFFSET);
@@ -208,187 +216,187 @@ void camera_loop(camera_config_t *config) {
 /**
  * Oversees the capture and playback of captured image frames.
  */
-void camera_interface()
-{
-	// New cycle. Reset needed status flags.
-	button_flag = false;
-	// Checks which buttons or switches are active.
-	check_inputs();
-	// Replays the PPM Frame values to the axi_ppm.
-	replay_mode_handler();
-	if(button_flag == false)
-	{
-		// Reset the counter used for button debouncing.
-		debounce_counter = 0;
-	}
-}
-
-
-/**
- * Checks the register values for any active
- * button or switch gpio lines.
- */
-void check_inputs()
-{
-	volatile Xuint16 *pS2MM_Mem = (Xuint16 *)XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_S2MM_ADDR_OFFSET+XAXIVDMA_START_ADDR_OFFSET);
-	volatile Xuint16 *pMM2S_Mem = (Xuint16 *)XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_MM2S_ADDR_OFFSET+XAXIVDMA_START_ADDR_OFFSET+4);
-	/************ BUTTON Center ************/
-
-	// Checks for valid BUTTON Center.
-	if(*btn_ptr & BTN_CENTER)
-	{
-		// A button has been pressed.
-			button_flag = true;
-		// The debounce counter has yet to hit the needed cycles. 
-		if(debounce_counter < debounce_threshold)
-		{
-			debounce_counter++;
-			// Signals the a button has started the debounce process.
-			debounce_finished = false;
-		}
-		// Enough cycles have passed of constant button press && this button's functions
-		// have yet to be executed for this press.
-		else if((debounce_counter >= debounce_threshold) && (debounce_finished != true))
-		{
-			// Debounce process finished.
-			debounce_finished = true;
-			xil_printf("Center button pressed.");
-			// Capture and store the current image for 2 seconds.
-			xil_printf("Frame Recorded @ index: %d\r\n", frame_index);
-			// Store image into memeory.
-			images[1920*1080*frame_index] = pS2MM_Mem;
-			// Flash image to screen.
-			pS2MM_Mem = images[1920*1080*image_index];
-			// Holds for 2 seconds.
-			sleep(2);
-			// Array boundary detection. Checks if next move will cause out-of-bounds error.
-			if(!((image_index + 1) > MAX_IMAGES_TO_RECORD))
-			{
-				// Increments the frame index.
-				image_index++;
-				// Recorded images have been changed. Reset Replay index.
-				replay_index = 0;
-			}
-		}
-	}
-
-	/************ SWITCH 0 ************/
-
-    // Checks for valid SWITCH 0.
-    if(*sw_ptr & SW_0)
-    {
-    	// Register value 1 detected.
-    	// Switching to Replay Mode.
-    	replay_mode = REPLAY;
-	}
-	else
-	{
-		// Register value 0 detected.
-		// Switching out of replay Mode.
-		replay_mode = NONE;
-	}
-
-	/************ SWITCH 2 ************/
-
-	// Checks for valid SWITCH 2.
-    if(*sw_ptr & SW_2)
-    {
-    	xil_printf("Switch 2 activated");
-		// Exit application flag set.
-		exit_flag = true;
-	}
-
-	/************ SWITCH 7 ************/
-
-	// Checks for valid SWITCH 7.
-	if(*sw_ptr & SW_7)
-	{
-		//reset record array
-		image_index = 0;
-		replay_index = 0;
-		xil_printf("\nReset indexs.\r\n");
-	}
-}
-
-
-/**
- * BTN_RIGHT displays the next stored image from memory.
- * BTN_LEFT decrements the play index & plays previous image.
- */
-void replay_mode_handler()
-{
-	volatile Xuint16 *pS2MM_Mem = (Xuint16 *)XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_S2MM_ADDR_OFFSET+XAXIVDMA_START_ADDR_OFFSET);
-	volatile Xuint16 *pMM2S_Mem = (Xuint16 *)XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_MM2S_ADDR_OFFSET+XAXIVDMA_START_ADDR_OFFSET+4);
-	// Replay Mode active.
-	if(replay_mode == REPLAY)
-	{
-		// Increments the 'replay_index'. Plays the next image.
-		if(*btn_ptr & BTN_RIGHT)
-		{
-			// A button has been pressed.
-			button_flag = true;
-			// The debounce counter has yet to hit the needed cycles. 
-			if(debounce_counter < debounce_threshold)
-			{
-				debounce_counter++;
-				// Signals the a button has started the debounce process.
-				debounce_finished = false;
-			}
-			// Enough cycles have passed of constant button press && this button's functions
-			// have yet to be executed for this press.
-			else if((debounce_counter >= debounce_threshold) && (debounce_finished != true))
-			{
-				// Debounce process finished.
-				debounce_finished = true;
-				xil_printf("RIGHT button pressed.");
-				
-				// Does not play indexs that hold no data. (Unrecorded)
-				if(pMM2S_Mem[replay_index] == 0)
-				{
-					// Pointers to the S2MM memory frame and M2SS memory frame.
-					xil_printf("Image Replayed @ index: %d\r\n", replay_index);
-					// Play stored array.
-					pMM2S_Mem = images[1920*1080*replay_index];
-					// Check for max images.
-					if(!((replay_index + 1) > MAX_IMAGES_TO_RECORD))
-					{
-						// Array will be inbounds.
-						replay_index++;
-					}
-				}
-			}
-			
-		}
-		// Decrement the 'replay_index'. Plays the previous image.
-		if(*btn_ptr & BTN_LEFT)
-		{
-			// A button has been pressed.
-			button_flag = true;
-			// The debounce counter has yet to hit the needed cycles. 
-			if(debounce_counter < debounce_threshold)
-			{
-				debounce_counter++;
-				// Signals the a button has started the debounce process.
-				debounce_finished = false;
-			}
-			// Enough cycles have passed of constant button press && this button's functions
-			// have yet to be executed for this press.
-			else if((debounce_counter >= debounce_threshold) && (debounce_finished != true))
-			{
-				// Debounce process finished.
-				debounce_finished = true;
-				xil_printf("LEFT button pressed.");
-				// Array boundary detection. Checks if next move will cause out-of-bounds error.
-				if(!((replay_index - 1) < 0))
-				{
-					// Array will be inbounds.
-					replay_index--;
-					xil_printf("Replay index decremented to: %d\r\n", replay_index);
-					// Display frame @ current index.
-					pMM2S_Mem = images[1920*1080*replay_index];
-				}
-			}
-		}
-	}
-}
-	
+//void camera_interface()
+//{
+//	// New cycle. Reset needed status flags.
+//	button_flag = false;
+//	// Checks which buttons or switches are active.
+//	check_inputs();
+//	// Replays the PPM Frame values to the axi_ppm.
+//	replay_mode_handler();
+//	if(button_flag == false)
+//	{
+//		// Reset the counter used for button debouncing.
+//		debounce_counter = 0;
+//	}
+//}
+//
+//
+///**
+// * Checks the register values for any active
+// * button or switch gpio lines.
+// */
+//void check_inputs()
+//{
+//	volatile Xuint16 *pS2MM_Mem = (Xuint16 *)XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_S2MM_ADDR_OFFSET+XAXIVDMA_START_ADDR_OFFSET);
+//	volatile Xuint16 *pMM2S_Mem = (Xuint16 *)XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_MM2S_ADDR_OFFSET+XAXIVDMA_START_ADDR_OFFSET+4);
+//	/************ BUTTON Center ************/
+//
+//	// Checks for valid BUTTON Center.
+//	if(*btn_ptr & BTN_CENTER)
+//	{
+//		// A button has been pressed.
+//			button_flag = true;
+//		// The debounce counter has yet to hit the needed cycles.
+//		if(debounce_counter < debounce_threshold)
+//		{
+//			debounce_counter++;
+//			// Signals the a button has started the debounce process.
+//			debounce_finished = false;
+//		}
+//		// Enough cycles have passed of constant button press && this button's functions
+//		// have yet to be executed for this press.
+//		else if((debounce_counter >= debounce_threshold) && (debounce_finished != true))
+//		{
+//			// Debounce process finished.
+//			debounce_finished = true;
+//			xil_printf("Center button pressed.");
+//			// Capture and store the current image for 2 seconds.
+//			xil_printf("Frame Recorded @ index: %d\r\n", frame_index);
+//			// Store image into memeory.
+//			images[1920*1080*frame_index] = pS2MM_Mem;
+//			// Flash image to screen.
+//			pS2MM_Mem = images[1920*1080*image_index];
+//			// Holds for 2 seconds.
+//			sleep(2);
+//			// Array boundary detection. Checks if next move will cause out-of-bounds error.
+//			if(!((image_index + 1) > MAX_IMAGES_TO_RECORD))
+//			{
+//				// Increments the frame index.
+//				image_index++;
+//				// Recorded images have been changed. Reset Replay index.
+//				replay_index = 0;
+//			}
+//		}
+//	}
+//
+//	/************ SWITCH 0 ************/
+//
+//    // Checks for valid SWITCH 0.
+//    if(*sw_ptr & SW_0)
+//    {
+//    	// Register value 1 detected.
+//    	// Switching to Replay Mode.
+//    	replay_mode = REPLAY;
+//	}
+//	else
+//	{
+//		// Register value 0 detected.
+//		// Switching out of replay Mode.
+//		replay_mode = NONE;
+//	}
+//
+//	/************ SWITCH 2 ************/
+//
+//	// Checks for valid SWITCH 2.
+//    if(*sw_ptr & SW_2)
+//    {
+//    	xil_printf("Switch 2 activated");
+//		// Exit application flag set.
+//		exit_flag = true;
+//	}
+//
+//	/************ SWITCH 7 ************/
+//
+//	// Checks for valid SWITCH 7.
+//	if(*sw_ptr & SW_7)
+//	{
+//		//reset record array
+//		image_index = 0;
+//		replay_index = 0;
+//		xil_printf("\nReset indexs.\r\n");
+//	}
+//}
+//
+//
+///**
+// * BTN_RIGHT displays the next stored image from memory.
+// * BTN_LEFT decrements the play index & plays previous image.
+// */
+//void replay_mode_handler()
+//{
+//	volatile Xuint16 *pS2MM_Mem = (Xuint16 *)XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_S2MM_ADDR_OFFSET+XAXIVDMA_START_ADDR_OFFSET);
+//	volatile Xuint16 *pMM2S_Mem = (Xuint16 *)XAxiVdma_ReadReg(config->vdma_hdmi.BaseAddr, XAXIVDMA_MM2S_ADDR_OFFSET+XAXIVDMA_START_ADDR_OFFSET+4);
+//	// Replay Mode active.
+//	if(replay_mode == REPLAY)
+//	{
+//		// Increments the 'replay_index'. Plays the next image.
+//		if(*btn_ptr & BTN_RIGHT)
+//		{
+//			// A button has been pressed.
+//			button_flag = true;
+//			// The debounce counter has yet to hit the needed cycles.
+//			if(debounce_counter < debounce_threshold)
+//			{
+//				debounce_counter++;
+//				// Signals the a button has started the debounce process.
+//				debounce_finished = false;
+//			}
+//			// Enough cycles have passed of constant button press && this button's functions
+//			// have yet to be executed for this press.
+//			else if((debounce_counter >= debounce_threshold) && (debounce_finished != true))
+//			{
+//				// Debounce process finished.
+//				debounce_finished = true;
+//				xil_printf("RIGHT button pressed.");
+//
+//				// Does not play indexs that hold no data. (Unrecorded)
+//				if(pMM2S_Mem[replay_index] == 0)
+//				{
+//					// Pointers to the S2MM memory frame and M2SS memory frame.
+//					xil_printf("Image Replayed @ index: %d\r\n", replay_index);
+//					// Play stored array.
+//					pMM2S_Mem = images[1920*1080*replay_index];
+//					// Check for max images.
+//					if(!((replay_index + 1) > MAX_IMAGES_TO_RECORD))
+//					{
+//						// Array will be inbounds.
+//						replay_index++;
+//					}
+//				}
+//			}
+//
+//		}
+//		// Decrement the 'replay_index'. Plays the previous image.
+//		if(*btn_ptr & BTN_LEFT)
+//		{
+//			// A button has been pressed.
+//			button_flag = true;
+//			// The debounce counter has yet to hit the needed cycles.
+//			if(debounce_counter < debounce_threshold)
+//			{
+//				debounce_counter++;
+//				// Signals the a button has started the debounce process.
+//				debounce_finished = false;
+//			}
+//			// Enough cycles have passed of constant button press && this button's functions
+//			// have yet to be executed for this press.
+//			else if((debounce_counter >= debounce_threshold) && (debounce_finished != true))
+//			{
+//				// Debounce process finished.
+//				debounce_finished = true;
+//				xil_printf("LEFT button pressed.");
+//				// Array boundary detection. Checks if next move will cause out-of-bounds error.
+//				if(!((replay_index - 1) < 0))
+//				{
+//					// Array will be inbounds.
+//					replay_index--;
+//					xil_printf("Replay index decremented to: %d\r\n", replay_index);
+//					// Display frame @ current index.
+//					pMM2S_Mem = images[1920*1080*replay_index];
+//				}
+//			}
+//		}
+//	}
+//}
+//

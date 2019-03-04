@@ -35,6 +35,7 @@
 #include "xvtc.h"
 #include "xaxivdma.h"
 #include "xtpg_app.h"
+#include "xtime_l.h"
 
 
 // Constants for library code
@@ -124,67 +125,6 @@ struct struct_vres_timing_t {
 	Xuint32 HBackPorch;
 	Xuint32 HSyncPolarity;
 }; typedef struct struct_vres_timing_t vres_timing_t;
-
-
-// Register address for the switch and button gpio ports.
-uint32_t *sw_ptr = XPAR_SWS_8BITS_BASEADDR;
-uint32_t *btn_ptr = XPAR_BTNS_5BITS_BASEADDR;
-
-// Defines the max number of images the storage should hold.
-#define MAX_IMAGES_TO_RECORD 32
-
-// SWITCH bitmasks.
-#define SW_0       0x01
-#define SW_1       0x02
-#define SW_2       0x04
-#define SW_3       0x08
-#define SW_4	   0x10
-#define SW_5	   0x20
-#define SW_6	   0x40
-#define SW_7	   0x80
-
-// BUTTON bitmasks.
-#define BTN_CENTER 0x01
-#define BTN_DOWN   0x02
-#define BTN_LEFT   0x04
-#define BTN_RIGHT  0x08
-#define BTN_UP     0x10
-
-// User given command to exit the program.
-// True = Yes
-// False = No
-bool exit_flag = false;
-
-// Array to hold the stored images.
-int images[1920*1080*MAX_IMAGES_TO_RECORD];
-
-// This index is used to store images.
-int image_index = 0;
-
-// Used to switch between stored pictures.
-int replay_index = 0;
-
-// Status of all button presses. True if one or more buttons are pressed.
-// False otherwise.
-bool button_flag = false;
-
-// True = debounce_counter has hit or exceeded the debounce_threshold.
-// False = not yet hit needed cycles.
-bool debounce_finished = false;
-
-// Counter used to debounce the buttons.
-int debounce_counter = 0;
-
-// Amount that the debounce counter has to hit to execute the buttons funtions.
-int debounce_threshold = 10;
-
-// Replay mode to play back stored frames.
-// NONE     - No Replay allowed.
-// REPLAY   - BTN_RIGHT displays the next captured frame to the screen.
-// 			  BTN_LEFT decrements the current picture index and
-//                     displays the previous picture..
-enum Software_Replay {REPLAY_NONE, REPLAY};
-enum Software_Replay replay_mode = REPLAY_NONE;
 
 
 // Function prototypes (camera_app.c)
