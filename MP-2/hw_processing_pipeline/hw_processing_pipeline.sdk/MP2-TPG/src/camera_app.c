@@ -30,7 +30,7 @@ uint32_t *sw_ptr = XPAR_SWS_8BITS_BASEADDR;
 uint32_t *btn_ptr = XPAR_BTNS_5BITS_BASEADDR;
 
 // Defines the max number of images the storage should hold.
-#define MAX_IMAGES_TO_RECORD 32
+#define MAX_IMAGES_TO_RECORD 100
 
 // SWITCH bitmasks.
 #define SW_0       0x01
@@ -323,10 +323,10 @@ void check_inputs(camera_config_t *config)
 		exit_flag = true;
 	}
 
-	/************ BUTTON UP ************/
+	/************ SWITCH 3 ************/
 
 	// Checks for valid BTN UP.
-	if(*btn_ptr & BTN_UP)
+	if(*sw_ptr & SW_3)
 	{
 		// Array indexes.
 		image_index = 0;
@@ -385,7 +385,7 @@ void capture_video()
 	// Pull the image into an array.
 	store_image(image_index);
 	// Array boundary detection. Checks if next move will cause out-of-bounds error.
-	if(!((image_index + 1) > MAX_IMAGES_TO_RECORD))
+	if(!((image_index + 1) >= MAX_IMAGES_TO_RECORD))
 	{
 		// Increments the frame index.
 		image_index++;
@@ -403,12 +403,12 @@ void replay_mode_handler(camera_config_t *config)
 	// Check for image mode.
 	if(replay_mode == IMAGE)
 	{
-		individual_image();
+		individual_image(&camera_config);
 	}
 	// Check for video mode.
 	else if(replay_mode == VIDEO)
 	{
-		video_playback();
+		video_playback(&camera_config);
 	}
 }
 
@@ -422,7 +422,7 @@ void video_playback(camera_config_t *config)
 	// Increments the 'replay_index'. Plays the next image.
 	if(*btn_ptr & BTN_UP)
 	{
-		xil_printf("UP button pressed.\r\n");
+		disable_hardware(&camera_config);
 		// Does not play indexes that hold no data. (Unrecorded)
 		while(replay_index <= image_index)
 		{
@@ -435,13 +435,12 @@ void video_playback(camera_config_t *config)
 				// Array will be inbounds. Increment.
 				replay_index++;
 			}
-			replay_index++;
 		}
+		enable_hardware(&camera_config);
 	}
 	// Decrement the 'replay_index'. Plays the previous image.
 	if(*btn_ptr & BTN_DOWN)
 	{
-		xil_printf("DOWN button pressed.\r\n");
 		disable_hardware(&camera_config);
 		while(replay_index > 0)
 		{
@@ -462,7 +461,7 @@ void video_playback(camera_config_t *config)
 /** 
  * Handles the logic to play back a single image at a time.
  */
-void individual_image()
+void individual_image(camera_config_t *config)
 {
 	// Increments the 'replay_index'. Plays the next image.
 	if(*btn_ptr & BTN_RIGHT)
@@ -482,13 +481,14 @@ void individual_image()
 		{
 			// Debounce process finished.
 			debounce_finished = true;
-			xil_printf("RIGHT button pressed.\r\n");
 			// Do not play indexes that hold no data. (Unrecorded)
-			if(replay_index <= image_index)
+			if(replay_index < image_index)
 			{
-				// Play stored array.
-				// Flash image to screen.
+
+				disable_hardware(&camera_config);
 				display_image(replay_index);
+				sleep(2);
+				enable_hardware(&camera_config);
 				// Check for max images.
 				if(!((replay_index + 1) > MAX_IMAGES_TO_RECORD))
 				{
@@ -517,14 +517,16 @@ void individual_image()
 		{
 			// Debounce process finished.
 			debounce_finished = true;
-			xil_printf("LEFT button pressed.\r\n");
 			// Array boundary detection. Checks if next move will cause out-of-bounds error.
 			if(!((replay_index - 1) < 0))
 			{
 				// Array will be inbounds. Decrement.
 				replay_index--;
 				// Flash image to screen.
+				disable_hardware(&camera_config);
 				display_image(replay_index);
+				sleep(2);
+				enable_hardware(&camera_config);
 			}
 		}
 	}
@@ -540,7 +542,10 @@ void display_image(int index)
 	// Play stored array index.
 	size_t size = res*sizeof(uint16_t);
 	memcpy(pMM2S_Mem, &images[res*index], size);
-
+	if(replay_mode == IMAGE)
+	{
+		sleep(2);
+	}
 }
 
 

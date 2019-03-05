@@ -176,7 +176,7 @@ int fmc_imageon_enable( camera_config_t *config )
 
    // Output static Frame buffer for 5 seconds
    xil_printf( "Output static Frame buffer for 5 seconds\n\r" );
-   sleep(5);
+   sleep(1);
 
 
    // Initialize Input Side of AXI VDMA
@@ -208,8 +208,15 @@ int fmc_imageon_enable( camera_config_t *config )
 
    // Output Video input source in Hardware mode for 10 seconds
    xil_printf( "Output Video input source in Hardware mode for 10 seconds\n\r" );
-   sleep(10);
+   sleep(1);
 
+   // Used for FPS Calculation
+   onsemi_vita_get_status( &(config->onsemi_vita), &(config->vita_status_t1), 0/*config->bVerbose*/);
+   sleep(1);
+   onsemi_vita_get_status( &(config->onsemi_vita), &(config->vita_status_t2), 0/*config->bVerbose*/);
+
+   int hw_fps = config->vita_status_t2.cntFrames - config->vita_status_t1.cntFrames;
+   xil_printf("\tHW Processing Pipeline Frame Rate   = %d frames/sec\n\r", hw_fps);
 
    // Status of AXI VDMA
    vfb_dump_registers( &(config->vdma_hdmi) );
