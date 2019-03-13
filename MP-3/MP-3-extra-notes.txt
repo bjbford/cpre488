@@ -1,0 +1,222 @@
+MP-3: Linux steps  (use a RHEL7 remote server)
+
+For the first number of steps of MP-3 you will be following this tutoral: 
+Buiding Linux Yourself (DIY) option: https://xilinx-wiki.atlassian.net/wiki/spaces/A/pages/18841738/Getting+Started  
+
+
+Some Quick Ref settings:
+source /remote/Xilinx/2018.3/SDK/2018.3/settings64.sh
+export CROSS_COMPILE=arm-linux-gnueabihf-
+export ARCH=arm
+cd into dtc: export PATH=`pwd`:$PATH
+cd into u-boot-xlnx/tools : PATH=`pwd`:$PATH
+export CPATH=:<full-path-to>/include-hack
+export LIBRARY_PATH=:<full-path-to>/lib-hack
+export LD_LIBRARY_PATH=<full-path-to>/lib-hack/
+
+
+
+***I. Get the sources: https://xilinx-wiki.atlassian.net/wiki/spaces/A/pages/18842156/Fetch+Sources
+
+Note we have provided these on Cybox
+
+1) git clone for repositories:
+a) https://github.com/Xilinx/linux-xlnx.git (The Linux kernel with Xilinx patches and drivers: about 15 minutes: about 2GB repo)
+b) https://github.com/Xilinx/u-boot-xlnx.git (The u-boot bootloader with Xilinx patches and drivers :  about 30 seconds : about 200 MB repo)
+c) https://github.com/Xilinx/device-tree-xlnx.git (Device Tree generator plugin for xsdk :  about 1 second : about 1 MB repo).  Also make a copy on the Windows machine that I am running VIVADO, in case the Linux network drive disconnects.
+d) https://git.kernel.org/pub/scm/utils/dtc/dtc.git ( Device Tree compiler (required to build U-Boot) : about 1 secdond 1MB repo)
+
+
+***II. Build FSBL: https://xilinx-wiki.atlassian.net/wiki/spaces/A/pages/18841798/B
+uild+FSBL
+
+This how-to describes how to build the First Stage Boot Loader (FSBL) for your target platform.
+
+Using SDK, create a New Application Project using the 'Zynq FSBL' template. 
+
+We will come back to this step later.
+
+
+***III. Build Device Tree Compiler (dtc) : https://xilinx-wiki.atlassian.net/wiki/spaces/A/pages/18841988/Build+Device+Tree+Compiler+dtc
+
+This page describes how to download and build the device tree compiler (DTC) from mainline. This utility is required for building U-Boot sucessfully. 
+
+ Build DTC: All commands have to be executed in your DTC source directory. There is a single dtc binary suitable for all architectures. There is not a need to build separate dtc binaries to support MicroBlaze and ARM.
+
+a) cd into DTC source directory
+b) make
+
+After the build process completes the dtc binary is created within the current directory. It is neccessary to make the path to the dtc binary accessible to tools (eg, the U-Boot build process). To make dtc available in other steps, it is recommended to add the tools directory to your $PATH variable.
+c) export PATH=`pwd`:$PATH
+
+
+***IV. Build U-Boot : https://xilinx-wiki.atlassian.net/wiki/spaces/A/pages/18841973/Build+U-Boot
+
+This how-to describes how to build the u-boot bootloader for your target platform. Building the U-Boot bootloader is a part of the Xilinx design flow described in Getting Started. U-Boot depends upon an externally build device tree compiler (dtc) in order to build successfully.
+
+0) Add paths so that openssl lib and .h files can be found (this is a hack for now)
+export CPATH=:<full-path-to>/include-hack
+export LIBRARY_PATH=:<full-path-to>/lib-hack
+export LD_LIBRARY_PATH=<full-path-to>/lib-hack/
+
+1) Add toolchain to PATH: source /remote/Xilinx/2018.3/SDK/2018.3/settings64.sh
+2) cd into u-boot-xlnx
+3) export CROSS_COMPILE=arm-linux-gnueabihf-
+4) export ARCH=arm
+5) make distclean
+6) make zynq_zed_defconfig
+7) make   (u-boot and u-boot.elf will be placed in top directory and mkimage in tools directory)
+
+8) cd tools
+9) export PATH=`pwd`:$PATH    (Places tools directory in search path for future steps)
+
+
+
+***V. Build and Modify a Rootfs : https://xilinx-wiki.atlassian.net/wiki/spaces/A/pages/18842473/Build+and+Modify+a+Rootfs
+
+This how-to describes the process to build a RAM disk or init.rd image. (We have downloaded and wrapped for you)
+
+1) Download the RamDisk Image: arm_ramdisk.image.gz
+2) Wrap image with a U-Boot header : mkimage -A arm -T ramdisk -C gzip -d arm_ramdisk.image.gz uramdisk.image.gz
+3) Check File Type !!example!!:
+
+> file uramdisk.image.gz
+
+Should give something like this:
+
+uramdisk.image.gz: u-boot legacy uImage, , Linux/ARM, RAMDisk Image (gzip), 4815459 bytes, Fri May 30 01:52:10 2014,
+Load Address: 0x00000000, Entry Point: 0x00000000, Header CRC: 0x265787C1, Data CRC: 0x2CA30F4B
+  
+
+
+***VI Build Device Tree Blob  : https://xilinx-wiki.atlassian.net/wiki/spaces/A/pages/18842279/Build+Device+Tree+Blob
+
+Significant amount of background on Device Trees, then starts the "real" directions below 
+
+Build Device Tree
+This how-to describes the process of compiling a device tree blob.
+
+0) Use VIVADO to make bitfile and associated hdf file.  Export Hardware to SDK, and open SDK
+1) SDK Menu: Xilinx > Repositories > New... (<bsp repo>) > OK : Select device-tree-xlnx folder from cloned repository (my want to make a local Windows copy of this directory, in case network drive to Linux disconnects)
+2) SDK Menu: File > New > Board Support Package > Board Support Package OS: device-tree > Finish  (make sure correct .hdf file is selected) 
+
+3) Open system.mss file and click on "Modify this BSP's Settings", and update if needed "bootargs" these are the command line argments Linux will use during booting, and "console_device" this is were Linux will send output to and get input from:
+bootargs value : console=ttyPS0,115200 root=/dev/ram rw earlyprintk
+console value  : ps7_uart_1 
+
+4) Copy dts/dtsi file from device-tree-bsp_0 to a linux directory e.g., build-dtb
+
+a) Also copy zedboad.dtsi directly from device tree repo
+b) Also modify system-top.dts to add zedboard.dtsi as last include
+
+5) Compiling a Device Tree Blob (.dtb) file from the DTS
+
+a) cd into the build-dtb directory you created and copied the dts/dtsi file generated by SDK
+b) Make sure the dtc tool that you built earlier is in your path (or give the path as part of the command e.g. /path-to-dtc/dtc)
+c) Run: dtc -I dts -O dtb -o devicetree.dtb system-top.dts
+- Grrr...: Appears the dts file is not in a compient format for dtc (e.g. dtc does not understand #include), so need to first run throught the gcc preprocessor to creat a single tempory dts, and then give that temp dts to dtc:
+i) create singl tmp dts file: gcc -E -nostdinc -undef -D__DTS__ -x assembler-with-cpp -o system-top.dts.tmp system-top.dts
+ii) Run dtc on temp dts file:  dtc -I dts -O dtb -o devicetree.dtb system-top.dts.tmp
+Note: Getting 2 warnings (But appears to have created a dtb file, we will see if any issues pop up later due to this, but I'm pretty sure I got these type of warning last time and was not an issue:
+system-top.dts:22.9-25.4: Warning (unit_address_vs_reg): /memory: node has a reg or ranges property, but no unit name
+pl.dtsi:20.26-24.5: Warning (simple_bus_reg): /amba_pl/misc_clk_0: missing or empty reg/ranges property
+
+
+***VII Build kernel   :  https://xilinx-wiki.atlassian.net/wiki/spaces/A/pages/18842481/Build+kernel
+
+This how-to describes the process of building the Linux kernel.
+
+0) cd into Linux source directory:  cd linux-xlnx
+1) make ARCH=arm xilinx_zynq_defconfig
+2) make ARCH=arm menuconfig
+3) make ARCH=arm UIMAGE_LOADADDR=0x8000 uImage  
+Note: About 35 minutes to compile uImage (places in linux-xlnx/arch/arm/boot/)
+
+
+***VIII Prepare boot image   :  https://xilinx-wiki.atlassian.net/wiki/spaces/A/pages/18841976/Prepare+boot+image
+
+This how-to describes the process of creating a boot image for Zynq (i.e., BOOT.bin). This page is only a quick start into this topic.
+For more information please refer to the "Zynq Software Developer Guide"
+
+1) Update FSBL project (linux-fsbl). Add to file fsbl_debug.h after #define DEBUG_INFO	0x00000002    /* More debug information */    : 
+
+#define FSBL_DEBUG_INFO    /* PHJ turn on verbose boot processing messages*/
+
+2) In SDK, right-click on linux-fsbl project and select "Create Boot Image"
+
+3) Add the u-boot.elf file as a data partion to the end
+
+4) Click Generate will place BOOT.bin in bootimage directory of FSBL project (i.e. linux-fsbl project)
+
+
+***IX Place files for booting into one place for copying to an SD card (assuming SD card is already formatted appropriately)
+
+1) mkdir sd-card
+
+2) copy the follow 4 file to sd-card directory
+a) BOOT.bin
+b) devicetree.dtb
+c) uImage
+d) uramdisk.image.gz
+
+3) Copy the contents of the sd-card directory to an SD card to be plugged into the Zedboard
+
+***X  Boot Linux from SD card
+
+1) Placed SD card into Zedboard
+2) Make sure jumpers are set for booting for the SD card
+3) Make sure USB-UART is connected and Putty is on connected to the board and has the correct BUAD setting etc.
+4) Power on board
+5) See if Zedboard starts to boot Linux.
+
+Hit any key to go in Manual load boot while in u-boot:
+
+u-boot> fatload mmc 0 0x3000000 uImage
+u-boot> fatload mmc 0 0x2A00000 devicetree.dtb
+u-boot> fatload mmc 0 0x2000000 uramdisk.image.gz
+u-boot> bootm 0x3000000 0x2000000 0x2A00000
+
+
+
+*** XI  Mounting SD card to /mnt
+
+1) Note likely due to an issue with failing to full auto boot from u-boot, the SD card is not getting auto mounted at boot time.  The follow allowed for manual mount (note fdisk -l is useful for getting partion info to use in mount command):
+
+mount /dev/mmcblk0p1 /mnt/
+
+
+
+*** XII  Develop and Compile USB launcher driver
+
+
+copy .ko file to you SD card
+
+
+*** XIII loading USB driver and using it to access the Launcher
+
+-1) Unbind generic driver: echo "1-1:1.0" > /sys/bus/usb/drivers/usbhid/unbind
+0) mv /lib/modules/3.6.0 to /lib/modules/4.19.0-xilinx-54441-g0ee2ead  (from uname -r)
+1) Load the driver: insmod /mnt/launcher_driver.ko
+
+a) Gives the following
+launcher_driver: loading out-of-tree module taints kernel.
+Minor receieved - 0
+usbcore: registered new interface driver launcher_driver
+
+b) Check that it was installed: ls /dev  (want to see launcher0)
+
+Needed to manually use mknod:  Found major and minor number to use in usbmisc under launcher_driver in /sys/bus/usb/driver.  cat uevent or cat device
+
+>mknod /dev/launcher0 c 180 0
+
+2) Use the driver to fire launcher
+
+Sending command to driver: echo -en '\x10' > /dev/launcher0 
+
+
+3) run C code to call driver
+
+a) ln -s ld-linux.so.3 ld-linux-armhf.so.3 
+b) run give compiled luanch code
+
+
