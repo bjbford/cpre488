@@ -447,20 +447,34 @@ static ssize_t launcher_write(struct file *file, const char *user_buffer,
 	}
 
 	/* initialize the urb properly */
-	usb_fill_bulk_urb(urb, dev->udev,
-			  usb_sndbulkpipe(dev->udev, dev->bulk_out_endpointAddr),
-			  buf, writesize, launcher_write_bulk_callback, dev);
-	urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
-	usb_anchor_urb(urb, &dev->submitted);
+	// usb_fill_bulk_urb(urb, dev->udev,
+	// 		  usb_sndbulkpipe(dev->udev, dev->bulk_out_endpointAddr),
+	// 		  buf, writesize, launcher_write_bulk_callback, dev);
+	// urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
+	// usb_anchor_urb(urb, &dev->submitted);
 
-	/* send the data out the bulk port */
-	retval = usb_submit_urb(urb, GFP_KERNEL);
+	// /* send the data out the bulk port */
+	// retval = usb_submit_urb(urb, GFP_KERNEL);
+
+	// This function sends a simple control message to 
+	// a specified endpoint and waits for the message 
+	// to complete, or timeout.
+	retval = usb_control_msg(dev->udev,
+        usb_sndctrlpipe(dev->udev, 0),
+        LAUNCHER_CTRL_REQUEST,
+        LAUNCHER_CTRL_REQEUST_TYPE,
+        LAUNCHER_CTRL_VALUE,
+        LAUNCHER_CTRL_INDEX,
+        &buf,
+        sizeof(buf),
+        HZ * 5); // HZ = ????
+
 	mutex_unlock(&dev->io_mutex);
-	if (retval) {
-		dev_err(&dev->interface->dev,
-			"%s - failed submitting write urb, error %d\n",
-			__func__, retval);
-		goto error_unanchor;
+
+	if (retval < 0)
+	{
+		DBG_ERR("usb_control_msg failed (%d)", retval);
+		up(&dev->limit_sem);
 	}
 
 	/*
@@ -537,13 +551,13 @@ static int launcher_probe(struct usb_interface *interface,
 	for (i = 0; i < iface_desc->desc.bNumEndpoints; ++i) {
 		endpoint = &iface_desc->endpoint[i].desc;
 
-		// if (!dev->bulk_in_endpointAddr &&
-		//     usb_endpoint_is_bulk_in(endpoint)) {
-		// 	/* we found a bulk in endpoint */
-		// 	buffer_size = usb_endpoint_maxp(endpoint);
-		// 	dev->bulk_in_size = buffer_size;
-		// 	dev->bulk_in_endpointAddr = endpoint->bEndpointAddress;
-		// 	dev->bulk_in_buffer = kmalloc(buffer_size, GFP_KERNEL);
+		if (!dev->bulk_in_endpointAddr &&
+		    usb_endpoint_is_bulk_in(endpoint)) {
+			/* we found a bulk in endpoint */
+			buffer_size = usb_endpoint_maxp(endpoint);
+			dev->bulk_in_size = buffer_size;
+			dev->bulk_in_endpointAddr = endpoint->bEndpointAddress;
+			dev->bulk_in_buffer = kmalloc(buffer_size, GFP_KERNEL);
 		// 	if (!dev->bulk_in_buffer) {
 		// 		dev_err(&interface->dev,
 		// 			"Could not allocate bulk_in_buffer\n");
@@ -555,7 +569,7 @@ static int launcher_probe(struct usb_interface *interface,
 		// 			"Could not allocate bulk_in_urb\n");
 		// 		goto error;
 		// 	}
-		// }
+		}
 
 		if (!dev->bulk_out_endpointAddr &&
 		    usb_endpoint_is_bulk_out(endpoint)) {
