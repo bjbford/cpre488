@@ -21,6 +21,7 @@
 #include <linux/uaccess.h>
 #include <linux/usb.h>
 #include <linux/mutex.h>
+#include "launcher_commands.h"
 
 
 /* Define these values to match your devices */
@@ -472,26 +473,15 @@ static ssize_t launcher_write(struct file *file, const char *user_buffer,
 	{
 		goto error;
 	}
-	/* create a urb, and a buffer for it, and copy the data to the urb */
-	// urb = usb_alloc_urb(0, GFP_KERNEL);
-	// if (!urb)
-	// {
-	// 	retval = -ENOMEM;
-	// 	goto error;
-	// }
-	// buf = usb_alloc_coherent(dev->udev, writesize, GFP_KERNEL, &urb->transfer_dma);
-	// if (!buf) 
-	// {
-	// 	retval = -ENOMEM;
-	// 	goto error;
-	// }
+	// Copies the user's input into the buffer to be sent to the 
+	// launcher.
 	if (copy_from_user(buf, user_buffer, writesize)) 
 	{
 		retval = -EFAULT;
 		goto error;
 	}
 
-	/* this lock makes sure we don't submit URBs to gone devices */
+	// This lock makes sure we don't submit URBs to gone devices.
 	mutex_lock(&dev->io_mutex);
 	if (!dev->interface) 
 	{
@@ -500,16 +490,6 @@ static ssize_t launcher_write(struct file *file, const char *user_buffer,
 		retval = -ENODEV;
 		goto error;
 	}
-
-	/* initialize the urb properly */
-	// usb_fill_bulk_urb(urb, dev->udev,
-	// 		  usb_sndbulkpipe(dev->udev, dev->bulk_out_endpointAddr),
-	// 		  buf, writesize, launcher_write_bulk_callback, dev);
-	// urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
-	// usb_anchor_urb(urb, &dev->submitted);
-
-	// /* send the data out the bulk port */
-	// retval = usb_submit_urb(urb, GFP_KERNEL);
 
 	// This function sends a simple control message to 
 	// a specified endpoint and waits until sent.
@@ -759,3 +739,7 @@ static struct usb_driver launcher_driver = {
 module_usb_driver(launcher_driver);
 
 MODULE_LICENSE("GPL");
+
+MODULE_AUTHOR("JARED DANNER");
+
+MODULE_DESCRIPTION("Usb missle launcher drive for ISU CprE 488 MP-3.");
