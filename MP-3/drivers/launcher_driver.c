@@ -25,8 +25,8 @@
 
 
 /* Define these values to match your devices */
-#define USB_SKEL_VENDOR_ID	0xfff0
-#define USB_SKEL_PRODUCT_ID	0xfff0
+#define LAUNCHER_VENDOR_ID	0x2123
+#define LAUNCHER_PRODUCT_ID	0x1010
 
 /* table of devices that work with this driver */
 static const struct usb_device_id launcher_table[] = {
@@ -427,10 +427,15 @@ static ssize_t launcher_write(struct file *file, const char *user_buffer,
 			  size_t count, loff_t *ppos)
 {
 	struct usb_launcher *dev;
-	int retval = 0;
+	int retval = 0, i;
 	struct urb *urb = NULL;
 	char *buf = NULL;
+	char *fullBuf = (char *)kmalloc(8, GFP_KERNEL);
 	size_t writesize = min(count, (size_t)MAX_TRANSFER);
+
+	//printk("Count is %d\n", count);
+	//printk("MAX_TRANSFER is %d\n", (size_t)MAX_TRANSFER);
+	printk("Writesize is %d\n", writesize);
 
 	dev = file->private_data;
 
@@ -473,6 +478,18 @@ static ssize_t launcher_write(struct file *file, const char *user_buffer,
 	{
 		goto error;
 	}
+
+	urb = usb_alloc_urb(0, GFP_KERNEL);
+	if (!urb) {
+		retval = -ENOMEM;
+		goto error;
+	}
+
+	buf = usb_alloc_coherent(dev->udev, writesize, GFP_KERNEL,
+				 &urb->transfer_dma);
+	
+
+	printk("Before user copy.\n");
 	// Copies the user's input into the buffer to be sent to the 
 	// launcher.
 	if (copy_from_user(buf, user_buffer, writesize)) 
@@ -480,6 +497,7 @@ static ssize_t launcher_write(struct file *file, const char *user_buffer,
 		retval = -EFAULT;
 		goto error;
 	}
+	printk("After user copy.\n");
 
 	// This lock makes sure we don't submit URBs to gone devices.
 	mutex_lock(&dev->io_mutex);
@@ -494,22 +512,39 @@ static ssize_t launcher_write(struct file *file, const char *user_buffer,
 	// This function sends a simple control message to 
 	// a specified endpoint and waits until sent.
 	// Retval = number of bytes transferred.
+	fullBuf[0] = LAUNCHER_CTRL_COMMAND_PREFIX;
+	fullBuf[1] = buf[0];
+	fullBuf[2] = 0;
+	fullBuf[3] = 0;
+	fullBuf[4] = 0;
+	fullBuf[5] = 0;
+	fullBuf[6] = 0;
+	fullBuf[7] = 0;
+
+	//printk("buf is %s\n", buf);
+	//for(i = 2; i < 8; i ++){
+	//	fullBuf[i] = 0;
+	//	printk("fullBuf is %d\n", fullBuf[i]);
+	//}
+
+	printk("size of fullBuf: %d\n", sizeof(fullBuf));
+
 	retval = usb_control_msg(dev->udev,
         usb_sndctrlpipe(dev->udev, 0),
         LAUNCHER_CTRL_REQUEST,
-        LAUNCHER_CTRL_REQEUST_TYPE,
+        LAUNCHER_CTRL_REQUEST_TYPE, // found in launcher_commands.h
         LAUNCHER_CTRL_VALUE,
         LAUNCHER_CTRL_INDEX,
-        &buf,
-        sizeof(buf),
-        0); // Wait until message has sent to continue.
+        &fullBuf,
+        sizeof(fullBuf),
+        500); // Wait until message has sent to continue.
 
 	mutex_unlock(&dev->io_mutex);
 
 	// Number of bytes transferred via usb.
 	if (retval < 0)
 	{
-		DBG_ERR("usb_control_msg failed (%d)", retval);
+		printk(KERN_INFO "usb_control_msg failed (%d)", retval);
 		up(&dev->limit_sem);
 	}
 

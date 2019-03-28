@@ -1,7 +1,7 @@
 # Simple Makefile to build launcher_driver.ko and launcher_control
 
 obj-m += launcher_driver.o
-KDIR := ../linux/linux-xlnx/
+KDIR := ../linux-xlnx/
 PWD := $(shell pwd)
 
 CC := $(CROSS_COMPILE)gcc
