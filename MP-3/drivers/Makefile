@@ -5,7 +5,7 @@ KDIR := ../linux-xlnx/
 PWD := $(shell pwd)
 
 CC := $(CROSS_COMPILE)gcc
-BIN = launcher_fire
+BIN = launcher_fire_camera
 SOURCES = $(BIN:=.c)
 
 
