@@ -533,11 +533,12 @@ static ssize_t launcher_write(struct file *file, const char *user_buffer,
 	 * it entirely
 	 */
 	
-	printk("Command sent - %x", buf[0]);
+	//printk("Command sent - %x", buf[0]);
 
 	usb_free_urb(urb);
 	kfree(fullBuf);
 	kfree(buf);
+	up(&dev->limit_sem);
 
 	return writesize;
 

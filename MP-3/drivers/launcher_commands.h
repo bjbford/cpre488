@@ -2,7 +2,7 @@
 #define LAUNCHER_VENDOR_ID              0x2123
 #define LAUNCHER_PRODUCT_ID             0x1010
 
-#define LAUNCHER_NODE                   "launcher"
+#define LAUNCHER_NODE                   "/dev/launcher0"
 #define LAUNCHER_CTRL_BUFFER_SIZE       8
 #define LAUNCHER_CTRL_REQUEST_TYPE      0x21
 #define LAUNCHER_CTRL_REQUEST           0x09

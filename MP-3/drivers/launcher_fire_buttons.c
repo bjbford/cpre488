@@ -7,8 +7,8 @@
 
 /*-------- CONSTANTS --------*/
 
-#define DEVICE_TREE_BTN 0x41200000
-#define DEVICE_TREE_SW 0x41240000
+#define DEVICE_TREE_BTN 0x41210000
+#define DEVICE_TREE_SW 0x41220000
 #define LAUNCHER_NODE           "/dev/launcher0"
 #define LAUNCHER_FIRE           0x10
 #define LAUNCHER_STOP           0x20
@@ -24,9 +24,8 @@
 
 /*-------- METHOD DECLARATIONS --------*/
 
-static void launcher_cmd(int fd, int cmd);
+static void launcher_cmd(int fd, int *cmd);
 int get_command(int* btn_ptr);
-static void launcher_cmd(int fd, int cmd);
 
 
 /*-------- MAIN METHOD --------*/
@@ -43,28 +42,26 @@ int main()
     // command to be sent to launcher.
     // Defaults as stop.
     int cmd = LAUNCHER_STOP;
+	int prevCmd = 0;
+	int stop = LAUNCHER_STOP;
     // Usb address.
     char *dev = LAUNCHER_NODE;
     // Delay between commands.
     unsigned int duration = 100;
-	int value_sw = 0;
-	int value_btn = 0;
-	printf("Hello There\n\n\n");
     // Memory maps the Zed Board switches to the the sw_ptr.
-    int* sw_ptr = mmap(&value_sw, // Address of map. Kernal chooses since NULL.
-                        4, // Length of map.
+    int* sw_ptr = mmap(NULL, // Address of map. Kernal chooses since NULL.
+                        1, // Length of map.
                         PROT_READ, // Pages may be read.
                         MAP_SHARED, // Shared map between processes.
                         open("/dev/mem", O_RDONLY), // Pointer.
                         DEVICE_TREE_SW); // Address of switches in the device tree.
     // Memory maps the Zed Board buttons to the the btn_ptr.
-    int* btn_ptr = mmap(&value_btn, // Address of map. Kernal chooses since NULL.
-                        4, // Length of map.
+    int* btn_ptr = mmap(NULL, // Address of map. Kernal chooses since NULL.
+                        1, // Length of map.
                         PROT_READ, // Pages may be read.
                         MAP_SHARED, // Shared map between processes.
                         open("/dev/mem", O_RDONLY), // Pointer.
                         DEVICE_TREE_BTN); // Address of buttons in the device tree.
-
 
     /*-------- CONNECT TO LAUNCHER --------*/
 
@@ -81,15 +78,14 @@ int main()
 
 
     /*-------- MAIN PROGRAM LOOP --------*/
-
     // Pulls the button input until switch 7 is 
     // flipped high. Switch hex value is 0x80.
-    while(!(*sw_ptr & 80))
+	// !(*(sw_ptr) & 80)
+    while(!(*(sw_ptr) & 80))
     {
         /*-------- DETECT BUTTON PRESS --------*/
-
         // Checks for valid memory map pointer.
-        if(!(*btn_ptr))
+        if(*btn_ptr)
         {
             // Pulls buttons. Gets int value
             // associated with each button.
@@ -102,27 +98,27 @@ int main()
             // command to stop.
             cmd = LAUNCHER_STOP;
         }
-        
-
         /*-------- SEND COMMAND --------*/
-
-        // Sends command to launcher.
-        launcher_cmd(fd, cmd);
-        // Allows the launcher to perform the given command
-        // for a certain duration.
-        usleep(duration * 1000);
-
-
-
-
-        // ASK BRIAN IF WE WANT THIS (probably).
-        launcher_cmd(fd, LAUNCHER_STOP);
+		//printf("Received command: %x\n", cmd);
+		if(!(cmd == prevCmd && cmd == LAUNCHER_STOP)){
+			//printf("Sending new command: %x\n", cmd); 
+			launcher_cmd(fd, &cmd);
+			usleep(duration * 1000);
+			if(cmd != LAUNCHER_STOP)
+			{
+				launcher_cmd(fd, &stop);
+			}
+		}
+		//usleep(duration * 1000);
+		prevCmd = cmd;
     }
 
     /*-------- PROGRAM CLEANUP --------*/
 
     // Closes connection to the launcher.
     close(fd);
+	munmap(sw_ptr, 1);
+	munmap(btn_ptr, 1);
     // Exit with success flag.
     return EXIT_SUCCESS;
 }
@@ -134,28 +130,21 @@ int main()
  */
 int get_command(int* btn_ptr)
 {
+	//printf("Checking for button press.\n");
     // Switch statement to detect and determine the buttons
     // being pressed.
-    switch(*btn_ptr){
-        // CENTER BUTTON 0x01
-        case 1:
-            return LAUNCHER_FIRE;
-        // DOWN BUTTON 0x02
-        case 2:
-            return LAUNCHER_DOWN;
-        // LEFT BUTTON 0x04
-        case 4:
-            return LAUNCHER_LEFT;
-        // RIGHT BUTTON 0x08
-        case 8:
-            return LAUNCHER_RIGHT;
-        // UP BUTTON 0x16
-        case 16: 
-            return LAUNCHER_UP;
-        // Default value to return in no buttons are pressed.
-        default:
-            return LAUNCHER_STOP;
-    }
+	if(*btn_ptr & 0x01)
+		return LAUNCHER_FIRE;
+	if(*btn_ptr & 0x02)
+        return LAUNCHER_DOWN;
+	if(*btn_ptr & 0x04)
+        return LAUNCHER_LEFT;
+	if(*btn_ptr & 0x08)
+        return LAUNCHER_RIGHT;
+	if(*btn_ptr & 0x10)
+        return LAUNCHER_UP;
+
+	return LAUNCHER_STOP;
 }
 
 
@@ -163,13 +152,14 @@ int get_command(int* btn_ptr)
  * Responsible for transmitting the user's command
  * to the missle launcher.
  */
-static void launcher_cmd(int fd, int cmd) 
+static void launcher_cmd(int fd, int *cmd) 
 {
     // Holds the amount of bytes sent over usb.
     int retval = 0;
     // Sends cmd to missle launcher.
     // Returns # of bytes sent to launcher.
-    retval = write(fd, &cmd, 1);
+    retval = write(fd, cmd, 1);
+	//printf("Bytes sent to launcher: %d\n", retval);
     // Loops until sent bytes is not equal to 1.
     while (retval != 1) 
     {
@@ -184,8 +174,8 @@ static void launcher_cmd(int fd, int cmd)
         }
     }
     // Launch command given. Pause for 5 seconds.
-    if (cmd == LAUNCHER_FIRE) 
+    if (*cmd == LAUNCHER_FIRE) 
     {
-        usleep(5000000);   
+        usleep(2000000);   
     }
 }
