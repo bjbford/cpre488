@@ -7,8 +7,8 @@
 
 /*-------- CONSTANTS --------*/
 
-#define DEVICE_TREE_BTN 0x41210000
-#define DEVICE_TREE_SW 0x41220000
+#define DEVICE_TREE_BTN 0x41200000
+#define DEVICE_TREE_SW 0x41210000
 #define LAUNCHER_NODE           "/dev/launcher0"
 #define LAUNCHER_FIRE           0x10
 #define LAUNCHER_STOP           0x20
