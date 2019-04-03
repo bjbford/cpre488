@@ -37,7 +37,7 @@
 static void launcher_cmd(int fd, int *cmd);
 int get_command(int* btn_ptr);
 void find_target(uint16_t image[1080][1920],uint16_t output[1080][1920],int fd, int debug);
-void move(uint32_t x,uint32_t y,int fd);
+void move(uint32_t x,uint32_t y,int32_t count,int fd);
 void disable_hardware(uint16_t* vdma_config);
 void enable_hardware(uint16_t* vdma_config);
 
@@ -164,7 +164,7 @@ int main()
 			}
 			lastmode =1;
 			find_target(frame_buff,frame_buff_write,fd,0);
-			sleep(1);
+			//sleep(1);
 		}
     }
 
@@ -248,7 +248,7 @@ void find_target(uint16_t image[1080][1920],uint16_t output[1080][1920],int fd,i
   uint32_t yrow = 0;
   uint64_t xsum = 0;
   uint64_t ysum = 0;
-	uint32_t		aver  =0;
+	uint32_t	aver  =0;
 	uint32_t	aveb = 0;
 	uint32_t	avey = 0;
 
@@ -257,7 +257,7 @@ void find_target(uint16_t image[1080][1920],uint16_t output[1080][1920],int fd,i
   for (i = 0; i < 1080; i++) {
     for (j =0; j < 1919; j=j+2) {
       // if brightness is more than 10%,              less than 75%        and the color is red
-      if(  ((image[i][j] & 0x00FF) > 0 ) && ((image[i][j] & 0x00FF) < 100 ) && (((image[i][j+1]>>8) & 0x00FF) > 160 ) ){  // find green_pixels      
+      if(  ((image[i][j] & 0x00FF) > 0 ) && ((image[i][j] & 0x00FF) < 100 ) && (((image[i][j+1]>>8) & 0x00FF) > 160) && (((image[i][j]>>8) & 0x00FF) < 130)){  // find green_pixels      
 		//green_pixels[i][j] |= 1;
         // find centroid of green_pixels
 			if(debug==1) {//print color
@@ -287,59 +287,115 @@ void find_target(uint16_t image[1080][1920],uint16_t output[1080][1920],int fd,i
 	//fprintf(fp, "\n\r\n\r");
   }
   //printf("r=%d,b=%d,y=%d\n\r",aver/(1920*1080),aveb/(1920*1080),avey/(1920*1080));
-  if (count != 0){
+  // Threshold check for 15000 red pixels before moving
+  if (count > 1000){
   	xrow = xsum/count; // finds centroid
   	yrow = ysum/count;
-  	//move(xrow,yrow,fd);
   }
+  xsum =0;
+  ysum =0;
   printf("found %d pixels\n\r",count);
   printf("Coordinates:x=%d,y=%d\n\r",xrow,yrow);
+  count = 0;
+if(xrow < 250){xrow = 250;}
+if(xrow > 1670){xrow = 1670;}
+if(yrow < 200){yrow = 200;}
+if(yrow > 880){yrow = 880;}
+int xbound = xrow;
+int ybound = yrow;
+
+ for (i = ybound-200; i < ybound+200; i++) {
+    for (j = xbound-250; j < xbound+249; j=j+2) {
+      // if brightness is more than 10%,              less than 75%        and the color is red
+      if(  ((image[i][j] & 0x00FF) > 0 ) && ((image[i][j] & 0x00FF) < 100 ) && (((image[i][j+1]>>8) & 0x00FF) > 160) && (((image[i][j]>>8) & 0x00FF) < 130)){  // find green_pixels      
+		//green_pixels[i][j] |= 1;
+        // find centroid of green_pixels
+			if(debug==1) {//print color
+				output[i][j] = image[i][j];
+				output[i][j+1] = image[i][j+1];
+	  		}
+        xrow += j;
+        yrow += i;
+        count++;
+      }
+      else{
+		if(debug==1) {// print black
+			output[i][j] = 0xFFFF;//((image[i][j] & 0x00FF) | ( ((image[i][j] & 0xFF00) + (10<<8) > 0xFF00) ? (0xFF00) : ((image[i][j] & 0xFF00) + (10<<8)) ) );//0x8000; //blue offset
+			output[i][j+1] = 0xFFFF;//((image[i][j+1] & 0x00FF) | ( ((image[i][j+1] & 0xFF00) + (5<<8) > 0xFF00) ? (0xFF00) : ((image[i][j+1] & 0xFF00) + (5<<8)) ) );//0x8000; //red offset
+			//aver += ((image[i][j] >> 8) & 0x00FF);
+			//aveb += ((image[i][j+1]>> 8) & 0x00FF);
+			//avey += (image[i][j] & 0xFF);
+			//printf("r=%d,b=%d,y=%d\n\r",((output[i][j] >> 8) & 0x00FF),((output[i][j+1] >> 8) & 0x00FF),(output[i][j] & 0x00FF));
+  		}
+        //fprintf(fp, "%x, ",image[i][j]);
+      }
+    }
+	xsum += xrow;
+	ysum += yrow;
+	xrow = 0;
+	yrow = 0;
+	//fprintf(fp, "\n\r\n\r");
+  }
+  if (count > 1000){
+  	xrow = xsum/count; // finds centroid
+  	yrow = ysum/count;
+  	move(xrow,yrow,count,fd);
+  }
+
   //fclose(fp);
 }
 
 
-void move(uint32_t x,uint32_t y,int fd ){
+void move(uint32_t x,uint32_t y,int32_t count,int fd ){
 	uint16_t xcenter = 1920/2;
-	uint16_t ycenter = 500;
+	uint16_t ycenter = 750;
+	ycenter += (15000-count)/300;
+	//if ((count > 5000) && (count < 15000)){ycenter = 500;}
+	//if ((count < 5000)){ycenter = 450;}
+
 	int cmd = 0;
-	uint16_t xoff = xcenter - x;
+	int xoff = xcenter - x;
 	uint8_t arm =0;
 
-	if (xoff<10){
+	if (xoff<-30){
 		xoff = 0 - xoff;
-		cmd = LAUNCHER_LEFT;
+		cmd = LAUNCHER_RIGHT;
+		printf("xoff: %d, moving right.\r\n", xoff);
 		launcher_cmd(fd, &cmd);
-		usleep(xoff* 2);//gets to x position
+		usleep(xoff<<8);//gets to x position
 		cmd = LAUNCHER_STOP;
 		launcher_cmd(fd, &cmd);
 	}
-	else if(xoff>10){
-		cmd = LAUNCHER_RIGHT;
+	else if(xoff>30){
+		cmd = LAUNCHER_LEFT;
+		printf("xoff: %d, moving left.\r\n", xoff);
 		launcher_cmd(fd, &cmd);
-		usleep(xoff* 2);//gets to x position
+		usleep(xoff<<8);//gets to x position
 		cmd = LAUNCHER_STOP;
 		launcher_cmd(fd, &cmd);
 	}
 	else{arm = 1;}
 	
 	cmd = 0;
-	uint16_t yoff = ycenter - y;
-	if (yoff<10){
+	int yoff = ycenter - y;
+	if (yoff<-30){
 		yoff = 0 - yoff;
 		cmd = LAUNCHER_DOWN;
+		printf("yoff: %d, moving down.\r\n", yoff);
 		launcher_cmd(fd, &cmd);
 		cmd = LAUNCHER_STOP;
-		usleep(yoff* 2);//gets to x position
+		usleep(yoff*0x140);//gets to x position
 		launcher_cmd(fd, &cmd);
 	}
-	else if(yoff>10){
+	else if(yoff>30){
 		cmd = LAUNCHER_UP;
+		printf("yoff: %d, moving up.\r\n", yoff);
 		launcher_cmd(fd, &cmd);
-		usleep(yoff* 2);//gets to x position
+		usleep(yoff<<7);//gets to x position
 		cmd = LAUNCHER_STOP;
 		launcher_cmd(fd, &cmd);
 	}
-	else if(arm == 2){
+	else if(arm == 1){
 		cmd = LAUNCHER_FIRE;
 		launcher_cmd(fd, &cmd);
 	}
