@@ -256,27 +256,26 @@ void find_target(uint16_t image[1080][1920],uint16_t output[1080][1920],int fd,i
  
   for (i = 0; i < 1080; i++) {
     for (j =0; j < 1919; j=j+2) {
-      // if brightness is more than 10%,              less than 75%        and the color is green ie red is 
-      if(  ((image[i][j] & 0x00FF) > 0 ) && ((image[i][j] & 0x00FF) < 0xC0 ) &&  (((image[i][j]>>8) & 0x00FF) < 0x30) && (((image[i][j+1]>>8) & 0x00FF) < 0x30) ){  // find green_pixels
-		//if (i<100 || i > 980){        
+      // if brightness is more than 10%,              less than 75%        and the color is red
+      if(  ((image[i][j] & 0x00FF) > 0 ) && ((image[i][j] & 0x00FF) < 100 ) && (((image[i][j+1]>>8) & 0x00FF) > 160 ) ){  // find green_pixels      
 		//green_pixels[i][j] |= 1;
         // find centroid of green_pixels
-		if(debug==1) {//print color
-			output[i][j] = image[i][j];
-			output[i][j+1] = image[i][j+1];
-  		}
+			if(debug==1) {//print color
+				output[i][j] = image[i][j];
+				output[i][j+1] = image[i][j+1];
+	  		}
         xrow += j;
         yrow += i;
         count++;
       }
       else{
 		if(debug==1) {// print black
-			output[i][j] = image[i][j+1];//0x8000;
-			output[i][j+1] = image[i][j];//0x8000;
+			output[i][j] = 0x00FF;//((image[i][j] & 0x00FF) | ( ((image[i][j] & 0xFF00) + (10<<8) > 0xFF00) ? (0xFF00) : ((image[i][j] & 0xFF00) + (10<<8)) ) );//0x8000; //blue offset
+			output[i][j+1] = 0x00FF;//((image[i][j+1] & 0x00FF) | ( ((image[i][j+1] & 0xFF00) + (5<<8) > 0xFF00) ? (0xFF00) : ((image[i][j+1] & 0xFF00) + (5<<8)) ) );//0x8000; //red offset
 			//aver += ((image[i][j] >> 8) & 0x00FF);
 			//aveb += ((image[i][j+1]>> 8) & 0x00FF);
 			//avey += (image[i][j] & 0xFF);
-			//printf("r=%d,b=%d,y=%d\n\r",((image[i][j] >> 8) & 0x00FF),((image[i][j+1] >> 8) & 0x00FF),(image[i][j] & 0x00FF));
+			//printf("r=%d,b=%d,y=%d\n\r",((output[i][j] >> 8) & 0x00FF),((output[i][j+1] >> 8) & 0x00FF),(output[i][j] & 0x00FF));
   		}
         //fprintf(fp, "%x, ",image[i][j]);
       }
@@ -287,11 +286,11 @@ void find_target(uint16_t image[1080][1920],uint16_t output[1080][1920],int fd,i
 	yrow = 0;
 	//fprintf(fp, "\n\r\n\r");
   }
-  printf("r=%d,b=%d,y=%d\n\r",aver/(1920*1080),aveb/(1920*1080),avey/(1920*1080));
+  //printf("r=%d,b=%d,y=%d\n\r",aver/(1920*1080),aveb/(1920*1080),avey/(1920*1080));
   if (count != 0){
   	xrow = xsum/count; // finds centroid
   	yrow = ysum/count;
-  	move(xrow,yrow,fd);
+  	//move(xrow,yrow,fd);
   }
   printf("found %d pixels\n\r",count);
   printf("Coordinates:x=%d,y=%d\n\r",xrow,yrow);
