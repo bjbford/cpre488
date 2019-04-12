@@ -1,0 +1,22 @@
+#include <stdio.h>// TODAY IS 4/4/17
+
+typedef struct pid_t {
+	float sensor; // Current value of property being controlled
+	float setpoint; // Goal value of the property being controlled
+	float KP, KI, KD; // P, I, D constants
+	float prev_error; // Previous difference between Current and Goal value
+	float acc_error; // Accumulated error
+	float pid_correction; // Correction output of the PID controller
+} pid_t;
+
+
+void compute_pid( pid_t *myPID);
+
+void compute_pid( pid_t *myPID){
+	int error = myPID->setpoint - myPID->sensor;
+myPID->pid_correction = (error) * myPID->KP;
+myPID->pid_correction += (error - myPID->prev_error)* myPID->KD;
+myPID->pid_correction += (myPID->acc_error) * myPID->KI;
+myPID->prev_error = error; // clear acc_error when turning on auto pilot
+myPID->acc_error += error;// running total of error, should go to 0
+}

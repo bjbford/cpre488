@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<section name="Workbench">
+	<item value="quad_uav_interfacing_wrapper.bit" key="quad_uav_interfacing_wrapper_hw_platform_0-bitFile"/>
+	<item value="" key="quad_uav_interfacing_wrapper_hw_platform_0-bmmFile"/>
+	<item value="Auto Detect" key="quad_uav_interfacing_wrapper_hw_platform_0-device"/>
+	<item value="Local" key="quad_uav_interfacing_wrapper_hw_platform_0-target"/>
+	<item value="quad_uav_interfacing_wrapper_hw_platform_0" key="programfpga.hwplatform"/>
+	<item value="false" key="quad_uav_interfacing_wrapper_hw_platform_0-partial_bit"/>
+</section>
