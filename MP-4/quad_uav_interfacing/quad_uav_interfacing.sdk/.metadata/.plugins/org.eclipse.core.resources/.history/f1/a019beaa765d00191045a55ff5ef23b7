@@ -607,7 +607,7 @@ float request_gps(bool debug) {
 		count += XUartPs_Send(&uart_ps, get_ZED_buf, 1);
 	}
 
-	memset(get_ZED_buf,0,1001);
+	memset(get_ZED_buf,0,16);
 	count = XUartPs_Recv(&uart_ps, get_ZED_buf, 1);
 	if (get_ZED_buf[0] == 'A') {
 		count = 0;
@@ -625,7 +625,7 @@ float request_gps(bool debug) {
 		sprintf((char*)get_ZED_buf,"pie X =%4.2f, Y=%4.2f, Z=%4.2f, Yaw=%4.2f",x,y,z,yaw);
 		count = 0;
 		while(count < 1000) {
-			count += XUartPs_Send(&uart_ps, get_ZED_buf+count, 1000-count);
+			count += XUartPs_Send(&uart_ps, get_ZED_buf+count, 1001-count);
 		}
 		count = 0;
 		while (count < 16) {

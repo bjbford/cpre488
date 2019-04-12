@@ -164,10 +164,10 @@ void check_inputs()
 		relay_mode = RELAY_HARDWARE;
 	}
 
-	/************ SWITCH 5 ************/
+	/************ BUTTON Center ************/
 
 	// Checks for valid BUTTON Center.
-	if(*sw_ptr & SW_5)
+	if(*btn_ptr & BTN_CENTER)
 	{
 		//xil_printf("Center button pressed. #: %d\r\n", counter++);
 		// Center button press detected.
@@ -248,7 +248,7 @@ void check_inputs()
 		//reset record array
 		frame_index = 0;
 		replay_index = 0;
-		//xil_printf("\nReset record array.\r\n");
+		xil_printf("\nReset record array.\r\n");
 	}
 }
 
@@ -324,7 +324,7 @@ void debug_mode_handler()
 	{
 		// Output PPM Channel values via UART.
 		// Current PPM Channel values are stored in slave registers 2 thru 7.
-		//xil_printf("Ch 1: %6d    Ch 2: %6d    Ch 3: %6d    Ch 4: %6d    Ch 5: %6d    Ch 6: %6d \r", *slv_reg2, *slv_reg3, *slv_reg4, *slv_reg5, *slv_reg6, *slv_reg7);
+		xil_printf("Ch 1: %6d    Ch 2: %6d    Ch 3: %6d    Ch 4: %6d    Ch 5: %6d    Ch 6: %6d \r", *slv_reg2, *slv_reg3, *slv_reg4, *slv_reg5, *slv_reg6, *slv_reg7);
 	}
 }
 
@@ -341,8 +341,8 @@ void record_mode_handler()
 		// Stores next PPM Frame w/ channel vaues in array and increments Frame index.
 		if(*btn_ptr & BTN_DOWN)
 		{
-//			//xil_printf("Down button pressed. #: %d\r\n", counter++);
-			//xil_printf("Frame Recorded @ index: %d\r\n", frame_index);
+//			xil_printf("Down button pressed. #: %d\r\n", counter++);
+			xil_printf("Frame Recorded @ index: %d\r\n", frame_index);
 			// Store values.
 			// Channel 1 Value
 			record[frame_index][0] = *slv_reg2;
@@ -391,7 +391,7 @@ void record_mode_handler()
 				frame_index--;
 				// Recorded frames have been changed. Reset Replay index.
 				replay_index = 0;
-				//xil_printf("Record index decremented to: %d\r\n", frame_index);
+				xil_printf("Record index decremented to: %d\r\n", frame_index);
 			}
 		}
 	}
@@ -415,7 +415,7 @@ void replay_mode_handler()
 			{
 //				xil_printf("RIGHT button pressed. #: %d\r\n", counter++);
 				// Output indexed PPM Frame channel values to axi_ppm.
-				//xil_printf("Frame Replayed @ index: %d\r\n", replay_index);
+				xil_printf("Frame Replayed @ index: %d\r\n", replay_index);
 				if(filter_mode == FILTER)
 				{
 					// Verifies all values being sent to the drone.
@@ -458,7 +458,7 @@ void replay_mode_handler()
 			{
 				// Array will be inbounds.
 				replay_index--;
-				//xil_printf("Replay index decremented to: %d\r\n", replay_index);
+				xil_printf("Replay index decremented to: %d\r\n", replay_index);
 			}
 		}
 	}
@@ -486,8 +486,8 @@ void filter_mode_handler(uint32_t ch1, uint32_t ch2, uint32_t ch3, uint32_t ch4,
  */
 void channel_boundary_correction(uint32_t ch1, uint32_t ch2, uint32_t ch3, uint32_t ch4, uint32_t ch5, uint32_t ch6)
 {
-	//xil_printf("Before Filter\r\n");
-	//xil_printf("Ch 1: %6d    Ch 2: %6d    Ch 3: %6d    Ch 4: %6d    Ch 5: %6d    Ch 6: %6d \r\n", ch1, ch2, ch3, ch4, ch5, ch6);
+	xil_printf("Before Filter\r\n");
+	xil_printf("Ch 1: %6d    Ch 2: %6d    Ch 3: %6d    Ch 4: %6d    Ch 5: %6d    Ch 6: %6d \r\n", ch1, ch2, ch3, ch4, ch5, ch6);
 
 	/************ CHANNEL 1 ************/
 
@@ -584,8 +584,8 @@ void channel_boundary_correction(uint32_t ch1, uint32_t ch2, uint32_t ch3, uint3
 	}
 	*slv_reg13 = ch6;
 
-	//xil_printf("After Filter\r\n");
-	//xil_printf("Ch 1: %6d    Ch 2: %6d    Ch 3: %6d    Ch 4: %6d    Ch 5: %6d    Ch 6: %6d \r\n", *slv_reg8, *slv_reg9, *slv_reg10, *slv_reg11, *slv_reg12, *slv_reg13);
+	xil_printf("After Filter\r\n");
+	xil_printf("Ch 1: %6d    Ch 2: %6d    Ch 3: %6d    Ch 4: %6d    Ch 5: %6d    Ch 6: %6d \r\n", *slv_reg8, *slv_reg9, *slv_reg10, *slv_reg11, *slv_reg12, *slv_reg13);
 
 }
 
@@ -602,19 +602,17 @@ float request_gps(bool debug) {
 	float x,y,z,yaw;
 	get_ZED_buf[1001] = 0;  // Make sure buffer is NULL terminated
 	get_ZED_buf[0] = 'S';
+	XUartPs_Send(&uart_ps, get_ZED_buf, 1);
 	int count = 0;
 	while(count < 1){
 		count += XUartPs_Send(&uart_ps, get_ZED_buf, 1);
 	}
 
-	memset(get_ZED_buf,0,1001);
-	count = XUartPs_Recv(&uart_ps, get_ZED_buf, 1);
-	if (get_ZED_buf[0] == 'A') {
-		count = 0;
-	}
+	count = 0;
 	while(count < 16){
 		count += XUartPs_Recv(&uart_ps, get_ZED_buf+count, 16-count);
 	}
+
 	x = *( (float*) (&get_ZED_buf[0] ) );
 	y = *( (float*) (&get_ZED_buf[4] ) );
 	z = *( (float*) (&get_ZED_buf[8] ) );
@@ -625,11 +623,7 @@ float request_gps(bool debug) {
 		sprintf((char*)get_ZED_buf,"pie X =%4.2f, Y=%4.2f, Z=%4.2f, Yaw=%4.2f",x,y,z,yaw);
 		count = 0;
 		while(count < 1000) {
-			count += XUartPs_Send(&uart_ps, get_ZED_buf+count, 1000-count);
-		}
-		count = 0;
-		while (count < 16) {
-			count += XUartPs_Recv(&uart_ps, get_ZED_buf + count, 16 - count);
+			count += XUartPs_Send(&uart_ps, get_ZED_buf+count, 1001-count);
 		}
 	}
 	debug_flag = false;

@@ -602,12 +602,12 @@ float request_gps(bool debug) {
 	float x,y,z,yaw;
 	get_ZED_buf[1001] = 0;  // Make sure buffer is NULL terminated
 	get_ZED_buf[0] = 'S';
+	XUartPs_Send(&uart_ps, get_ZED_buf, 1);
 	int count = 0;
 	while(count < 1){
 		count += XUartPs_Send(&uart_ps, get_ZED_buf, 1);
 	}
 
-	memset(get_ZED_buf,0,1001);
 	count = XUartPs_Recv(&uart_ps, get_ZED_buf, 1);
 	if (get_ZED_buf[0] == 'A') {
 		count = 0;
@@ -619,17 +619,17 @@ float request_gps(bool debug) {
 	y = *( (float*) (&get_ZED_buf[4] ) );
 	z = *( (float*) (&get_ZED_buf[8] ) );
 	yaw = *( (float*) (&get_ZED_buf[12] ) );
+	if (x > 10000  || y > 10000  || z > 10000  || yaw > 10000 ||
+        x < -10000 || y < -10000 || z < -10000 || yaw < -10000) {
+		volatile int a = 0;
+	}
 	if(debug) {
 		get_ZED_buf[0] = 'D';
 		XUartPs_Send(&uart_ps, get_ZED_buf, 1);
 		sprintf((char*)get_ZED_buf,"pie X =%4.2f, Y=%4.2f, Z=%4.2f, Yaw=%4.2f",x,y,z,yaw);
 		count = 0;
 		while(count < 1000) {
-			count += XUartPs_Send(&uart_ps, get_ZED_buf+count, 1000-count);
-		}
-		count = 0;
-		while (count < 16) {
-			count += XUartPs_Recv(&uart_ps, get_ZED_buf + count, 16 - count);
+			count += XUartPs_Send(&uart_ps, get_ZED_buf+count, 1001-count);
 		}
 	}
 	debug_flag = false;
