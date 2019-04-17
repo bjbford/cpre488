@@ -213,18 +213,31 @@ void relay_mode_handler()
 		// ONLY COPY WHEN NOT IN REPLAY MODE, OTHERWISE HOLD PREV.VALUES
 		if(replay_mode == REPLAY_NONE)
 		{
-			// Channel 1
-			*slv_reg8 = *slv_reg2;
-			// Channel 2
-			*slv_reg9 = *slv_reg3;
-			// Channel 3
-			*slv_reg10 = *slv_reg4;
-			// Channel 4
-			*slv_reg11 = *slv_reg5;
-			// Channel 5
-			*slv_reg12 = *slv_reg6;
-			// Channel 6
-			*slv_reg13 = *slv_reg7;
+			if(filter_mode == FILTER)
+			{
+				// Verifies all values being sent to the drone.
+				filter_mode_handler(record[replay_index][0],
+									record[replay_index][1],
+									record[replay_index][2],
+									record[replay_index][3],
+									record[replay_index][4],
+									record[replay_index][5]);
+			}
+			else
+			{
+				// Channel 1
+				*slv_reg8 = *slv_reg2;
+				// Channel 2
+				*slv_reg9 = *slv_reg3;
+				// Channel 3
+				*slv_reg10 = *slv_reg4;
+				// Channel 4
+				*slv_reg11 = *slv_reg5;
+				// Channel 5
+				*slv_reg12 = *slv_reg6;
+				// Channel 6
+				*slv_reg13 = *slv_reg7;
+			}
 		}
 		// Set config register 1 to tell axi_ppm that software relay mode
 		// has been enabled. PPM_Output is generated from the copied values.
