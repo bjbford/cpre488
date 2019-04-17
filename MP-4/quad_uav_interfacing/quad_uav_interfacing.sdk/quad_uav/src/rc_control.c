@@ -7,7 +7,6 @@
 
 // Self-made Libraries.
 #include "rc_control.h"
-#include "platform.h"
 
 typedef struct {
 	float sensor; // Current value of property being controlled
@@ -82,13 +81,6 @@ int main()
 			check_inputs();
 			// Controls how the PPM_Output is generated.
 			relay_mode_handler();
-			// Outputs current channel values over UART.
-			debug_mode_handler();
-			// Records & rewinds the current PPM capture.
-			//record_mode_handler();
-			// Replays the PPM Frame values to the axi_ppm.
-			//replay_mode_handler();
-
 		}
 		// Assigns new previous values.
 		frame_counter_previous = *slv_reg1;
@@ -111,33 +103,7 @@ void initialize_system()
 	enable_caches();
 	// Setup UART
 	uart_config_ptr = XUartPs_LookupConfig(XPAR_XUARTPS_0_DEVICE_ID);
-	if(uart_config_ptr == NULL) {
-		return EXIT_FAILURE;
-	}
-	s32 status = XUartPs_CfgInitialize(&uart_ps, uart_config_ptr, uart_config_ptr->BaseAddress);
-	if(status != XST_SUCCESS) {
-		return EXIT_FAILURE;
-	}
-
-	// Clears potentially uncleared memory on startup.
-	clear_memory();
-}
-
-/**
- * Ensures memory is cleared.
- */
-void clear_memory()
-{
-	// Ensure cleared memory for the PPM Frame array.
-	for(int i = 0; i < 50; i++)
-	{
-		// Clears the channel values for each frame index.
-		for(int j = 0; j < 6; j++)
-		{
-			// Sets all record values to 0.
-			record[i][j] = 0;
-		}
-	}
+	XUartPs_CfgInitialize(&uart_ps, uart_config_ptr, uart_config_ptr->BaseAddress);
 }
 
 /**
@@ -164,32 +130,14 @@ void check_inputs()
 		relay_mode = RELAY_HARDWARE;
 	}
 
-	/************ SWITCH 5 ************/
+	/************ SWITCH 1 ************/
 
-	// Checks for valid BUTTON Center.
-	if(*sw_ptr & SW_5)
+	// Checks for valid SWITCH 1.
+	if(*sw_ptr & SW_1)
 	{
 		//xil_printf("Center button pressed. #: %d\r\n", counter++);
 		// Center button press detected.
-		// Exit application flag set.
-		//exit_flag = true;
 		debug_flag = true;
-	}
-
-	/************ SWITCH 1 ************/
-
-    // Checks for valid SWITCH 1.
-    if(*sw_ptr & SW_1)
-    {
-    	// Register value 1 detected.
-    	// Switching to Software Debug Mode.
-    	debug_mode = DEBUG_SOFTWARE;
-	}
-	else
-	{
-		// Register value 0 detected.
-		// Switching out of debug mode.
-		debug_mode = DEBUG_NONE;
 	}
 
 	/************ SWITCH 2 ************/
@@ -198,57 +146,22 @@ void check_inputs()
     if(*sw_ptr & SW_2)
     {
     	// Register value 1 detected.
-    	// Switching to Software Record Mode.
-    	record_mode = RECORD;
-	}
-	else
-	{
-		// Register value 0 detected.
-		// Switching out of Software Record Mode.
-		record_mode = REC_NONE;
-	}
-
-	/************ SWITCH 3 ************/
-
-	// Checks for valid SWITCH 3.
-    if(*sw_ptr & SW_3)
-    {
-    	// Register value 1 detected.
-    	// Switching to Software Replay Mode.
-    	replay_mode = REPLAY;
-	}
-	else
-	{
-		// Register value 0 detected.
-		// Switching out of Software Replay Mode.
-		replay_mode = REPLAY_NONE;
-	}
-
-	/************ SWITCH 4 ************/
-
-	// Checks for valid SWITCH 4.
-    if(*sw_ptr & SW_4)
-    {
-    	// Register value 1 detected.
     	// Switching to Software Filter Mode.
-    	filter_mode = FILTER;
+    	//filter_mode = FILTER;
+    	pid_flag = true;
 	}
-	else
-	{
-		// Register value 0 detected.
-		// Switching out of Software Filter Mode.
-		filter_mode = FILTER_NONE;
-	}
-
-    /************ SWITCH 7 ************/
-
-	// Checks for valid SWITCH 7.
+//	else
+//	{
+//		// Register value 0 detected.
+//		// Switching out of Software Filter Mode.
+//		filter_mode = FILTER_NONE;
+//	}
+    // Checks for valid SWITCH 7.
 	if(*sw_ptr & SW_7)
 	{
-		//reset record array
-		frame_index = 0;
-		replay_index = 0;
-		//xil_printf("\nReset record array.\r\n");
+		// Register value 1 detected.
+		// Switching to Software Filter Mode.
+		exit_flag = true;
 	}
 }
 
@@ -276,191 +189,52 @@ void relay_mode_handler()
 		// into slave registers 8 -> 13. 8 thru 13 registers are
 		// then read by axi_ppm module to generate output.
 		// ONLY COPY WHEN NOT IN REPLAY MODE, OTHERWISE HOLD PREV.VALUES
-		if(replay_mode == REPLAY_NONE)
-		{
-			if(filter_mode == FILTER)
-			{
-				yaw_gps = request_gps(debug_flag);
-				// Verifies all values being sent to the drone.
-				filter_mode_handler(*slv_reg2,
-									*slv_reg3,
-									*slv_reg4,
-									*slv_reg5,
-									*slv_reg6,
-									*slv_reg7);
-
-			}
-			else
-			{
-				// Channel 1
-				*slv_reg8 = *slv_reg2;
-				// Channel 2
-				*slv_reg9 = *slv_reg3;
-				// Channel 3
-				*slv_reg10 = *slv_reg4;
-				// Channel 4
-				*slv_reg11 = *slv_reg5;
-				// Channel 5
-				*slv_reg12 = *slv_reg6;
-				// Channel 6
-				*slv_reg13 = *slv_reg7;
-			}
+//			if(filter_mode == FILTER)
+//			{
+//				yaw_gps = request_gps(debug_flag);
+//				// Verifies all values being sent to the drone.
+//				filter_mode_handler(*slv_reg2,
+//									*slv_reg3,
+//									*slv_reg4,
+//									*slv_reg5,
+//									*slv_reg6,
+//									*slv_reg7);
+//
+//			}
+//			else
+//			{
+		if(pid_flag) {
+			yaw_gps = request_gps(debug_flag);
+			pid yaw_pid;
+			yaw_pid.sensor = yaw_gps;	// input
+			yaw_pid.KP = 500;
+			yaw_pid.KI = 0;
+			yaw_pid.KD = 0;
+			yaw_pid.setpoint = 0;
+			compute_pid(&yaw_pid);
+			// Channel 4
+			//min yaw : 0x0001afee = 110000
+			*slv_reg11 = lroundf((*slv_reg5 + yaw_pid.pid_correction));		//output
+			//*slv_reg11 = ((*slv_reg5) + 5000);
+			pid_flag = false;
 		}
+		else {
+			*slv_reg11 = *slv_reg5;
+		}
+		// Channel 1
+		*slv_reg8 = *slv_reg2;
+		// Channel 2
+		*slv_reg9 = *slv_reg3;
+		// Channel 3
+		*slv_reg10 = *slv_reg4;
+		// Channel 5
+		*slv_reg12 = *slv_reg6;
+		// Channel 6
+		*slv_reg13 = *slv_reg7;
+//			}
 		// Set config register 1 to tell axi_ppm that software relay mode
 		// has been enabled. PPM_Output is generated from the copied values.
 		*slv_reg0 = 1;
-	}
-}
-
-
-/**
- * Prints (via UART) values of PPM channels stored in slave
- * registers from the axi_ppm module if debug_mode is active.
- */
-void debug_mode_handler()
-{
-	// SOFTWARE Debug Mode active.
-	if(debug_mode == DEBUG_SOFTWARE)
-	{
-		// Output PPM Channel values via UART.
-		// Current PPM Channel values are stored in slave registers 2 thru 7.
-		//xil_printf("Ch 1: %6d    Ch 2: %6d    Ch 3: %6d    Ch 4: %6d    Ch 5: %6d    Ch 6: %6d \r", *slv_reg2, *slv_reg3, *slv_reg4, *slv_reg5, *slv_reg6, *slv_reg7);
-	}
-}
-
-
-/**
- * BTN_DOWN stores next PPM in array and increments index.
- * BTN_UP rewinds the recording by decrementing array index.
- */
-void record_mode_handler()
-{
-	// Software Record Mode active.
-	if(record_mode == RECORD)
-	{
-		// Stores next PPM Frame w/ channel vaues in array and increments Frame index.
-		if(*btn_ptr & BTN_DOWN)
-		{
-//			//xil_printf("Down button pressed. #: %d\r\n", counter++);
-			//xil_printf("Frame Recorded @ index: %d\r\n", frame_index);
-			// Store values.
-			// Channel 1 Value
-			record[frame_index][0] = *slv_reg2;
-			// Channel 2 Value
-			record[frame_index][1] = *slv_reg3;
-			// Channel 3 Value
-			record[frame_index][2] = *slv_reg4;
-			// Channel 4 Value
-			record[frame_index][3] = *slv_reg5;
-			// Channel 5 Value
-			record[frame_index][4] = *slv_reg6;
-			// Channel 6 Value
-			record[frame_index][5] = *slv_reg7;
-
-			// Array boundary detection. Checks if next move will cause out-of-bounds error.
-			if(!((frame_index + 1) > MAX_FRAMES_TO_RECORD))
-			{
-				// Increments the frame index.
-				frame_index++;
-				// Recorded frames have been changed. Reset Replay index.
-				replay_index = 0;
-			}
-		}
-		// Rewinds the recording by decrementing array index.
-		if(*btn_ptr & BTN_UP)
-		{
-//			xil_printf("UP button pressed. #: %d\r\n", counter++);
-			// Clear current Frame data.
-			// Channel 1 Value
-			record[frame_index][0] = 0;
-			// Channel 2 Value
-			record[frame_index][1] = 0;
-			// Channel 3 Value
-			record[frame_index][2] = 0;
-			// Channel 4 Value
-			record[frame_index][3] = 0;
-			// Channel 5 Value
-			record[frame_index][4] = 0;
-			// Channel 6 Value
-			record[frame_index][5] = 0;
-
-			// Array boundary detection. Checks if next move will cause out-of-bounds error.
-			if(!((frame_index - 1) < 0))
-			{
-				// Moves left one column in the 2D array.
-				frame_index--;
-				// Recorded frames have been changed. Reset Replay index.
-				replay_index = 0;
-				//xil_printf("Record index decremented to: %d\r\n", frame_index);
-			}
-		}
-	}
-}
-
-
-/**
- * BTN_RIGHT transmits any stored PPM values over axi_ppm.
- * BTN_LEFT decrements the current play index.
- */
-void replay_mode_handler()
-{
-	// Software Replay Mode active.
-	if(replay_mode == REPLAY)
-	{
-		// Transmits stored PPM values over axi_ppm.
-		if(*btn_ptr & BTN_RIGHT)
-		{
-			// Does not play frames that hold no data. (Unrecorded)
-			if(record[replay_index][0] != 0)
-			{
-//				xil_printf("RIGHT button pressed. #: %d\r\n", counter++);
-				// Output indexed PPM Frame channel values to axi_ppm.
-				//xil_printf("Frame Replayed @ index: %d\r\n", replay_index);
-				if(filter_mode == FILTER)
-				{
-					// Verifies all values being sent to the drone.
-					filter_mode_handler(record[replay_index][0],
-										record[replay_index][1],
-										record[replay_index][2],
-										record[replay_index][3],
-										record[replay_index][4],
-										record[replay_index][5]);
-				}
-				else
-				{
-					// Channel 1
-					*slv_reg8 = record[replay_index][0];
-					// Channel 2
-					*slv_reg9 = record[replay_index][1];
-					// Channel 3
-					*slv_reg10 = record[replay_index][2];
-					// Channel 4
-					*slv_reg11 = record[replay_index][3];
-					// Channel 5
-					*slv_reg12 = record[replay_index][4];
-					// Channel 6
-					*slv_reg13 = record[replay_index][5];
-				}
-				// Array boundary detection. Checks if next move will cause out-of-bounds error.
-				if(!((replay_index + 1) > MAX_FRAMES_TO_RECORD))
-				{
-					// Array will be inbounds.
-					replay_index++;
-				}
-			}
-		}
-		// Decrement the current play index.
-		if(*btn_ptr & BTN_LEFT)
-		{
-//			xil_printf("LEFT button pressed. #: %d\r\n", counter++);
-			// Array boundary detection. Checks if next move will cause out-of-bounds error.
-			if(!((replay_index - 1) < 0))
-			{
-				// Array will be inbounds.
-				replay_index--;
-				//xil_printf("Replay index decremented to: %d\r\n", replay_index);
-			}
-		}
 	}
 }
 
@@ -489,6 +263,20 @@ void channel_boundary_correction(uint32_t ch1, uint32_t ch2, uint32_t ch3, uint3
 	//xil_printf("Before Filter\r\n");
 	//xil_printf("Ch 1: %6d    Ch 2: %6d    Ch 3: %6d    Ch 4: %6d    Ch 5: %6d    Ch 6: %6d \r\n", ch1, ch2, ch3, ch4, ch5, ch6);
 
+	// Checks for out-of-bounds Channel 4 width.
+	// Adjusts to nearest acceptable boundary if beyond limit.
+	// YAW CHANNEL
+	// Setup pid
+
+//	pid yaw_pid;
+//	yaw_pid.sensor = yaw_gps;	// input
+//	yaw_pid.KP = 100;
+//	yaw_pid.KI = 0;
+//	yaw_pid.KD = 0;
+//	yaw_pid.setpoint = 0;
+//	compute_pid(&yaw_pid);
+//	ch4 += yaw_pid.pid_correction;	// output
+
 	/************ CHANNEL 1 ************/
 
 	// Checks for out-of-bounds Channel 1 width.
@@ -497,7 +285,7 @@ void channel_boundary_correction(uint32_t ch1, uint32_t ch2, uint32_t ch3, uint3
 	{
 		ch1 = CHANNEL_1_MIN;
 	}
-	else if(*slv_reg2 > CHANNEL_1_MAX)
+	else if(ch1 > CHANNEL_1_MAX)
 	{
 		ch1 = CHANNEL_1_MAX;
 	}
@@ -533,9 +321,6 @@ void channel_boundary_correction(uint32_t ch1, uint32_t ch2, uint32_t ch3, uint3
 
 	/************ CHANNEL 4 ************/
 
-	// Checks for out-of-bounds Channel 4 width.
-	// Adjusts to nearest acceptable boundary if beyond limit.
-	// YAW CHANNEL
 	if(ch4 < CHANNEL_4_MIN)
 	{
 		ch4 = CHANNEL_4_MIN;
@@ -545,15 +330,7 @@ void channel_boundary_correction(uint32_t ch1, uint32_t ch2, uint32_t ch3, uint3
 		ch4 = CHANNEL_4_MAX;
 	}
 	*slv_reg11 = ch4;
-	// Setup pid
-//	pid yaw_pid;
-//	yaw_pid.sensor = yaw_gps;	// input
-//	yaw_pid.KP = 1;
-//	yaw_pid.KI = 0;
-//	yaw_pid.KD = 0;
-//	yaw_pid.setpoint = 0;
-//	compute_pid(&yaw_pid);
-//	*slv_reg11 = yaw_pid.pid_correction;	// output
+
 
 
 	/************ CHANNEL 5 ************/

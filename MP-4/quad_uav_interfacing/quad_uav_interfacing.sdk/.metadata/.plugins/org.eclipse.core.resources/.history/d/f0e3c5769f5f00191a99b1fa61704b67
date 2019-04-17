@@ -1,0 +1,412 @@
+/**
+ * Responsible for observing register values and configuring
+ * corresponding modes of operation.
+ *
+ * Author: Jared Danner
+ */
+
+// Self-made Libraries.
+#include "rc_control.h"
+
+typedef struct {
+	float sensor; // Current value of property being controlled
+	float setpoint; // Goal value of the property being controlled
+	float KP, KI, KD; // P, I, D constants
+	float prev_error; // Previous difference between Current and Goal value
+	float acc_error; // Accumulated error
+	float pid_correction; // Correction output of the PID controller
+} pid;
+
+// Ensure that value of each channel is between its min and max.
+//
+//      PPM Frames            units = ms
+// Channel 1 (Roll)    :   0.68 < x < 1.517
+// Channel 2 (Pitch)   :   0.70 < x < 1.512
+// Channel 3 (Thrust)  :   0.70 < x < 1.523
+// Channel 4 (Yaw)     :   0.67 < x < 1.590
+// Channel 5 (PIT)     :   0.60 < x < 1.625
+// Channel 6 (HOX PIT) :   0.60 < x < 1.625
+
+// Same table but converted from millsecond to clk cycles.
+// ASSUMING 100MHZ CLOCK.
+//
+//      PPM Frames            units = clk cycles
+// Channel 1 (Roll)    :   68,000 < x < 151,700
+// Channel 2 (Pitch)   :   70,000 < x < 151,200
+// Channel 3 (Thrust)  :   70,000 < x < 152,300
+// Channel 4 (Yaw)     :   67,000 < x < 159,000
+// Channel 5 (PIT)     :   60,000 < x < 162,500
+// Channel 6 (HOX PIT) :   60,000 < x < 162,500
+
+#define CHANNEL_1_MIN 68000
+#define CHANNEL_1_MAX 151700
+
+#define CHANNEL_2_MIN 70000
+#define CHANNEL_2_MAX 151200
+
+#define CHANNEL_3_MIN 70000
+#define CHANNEL_3_MAX 152300
+
+#define CHANNEL_4_MIN 67000
+#define CHANNEL_4_MAX 159000
+
+#define CHANNEL_5_MIN 60000
+#define CHANNEL_5_MAX 162500
+
+#define CHANNEL_6_MIN 60000
+#define CHANNEL_6_MAX 162500
+
+uint8_t get_ZED_buf[1002];
+
+void compute_pid(pid *myPID);
+float request_gps(bool debug);
+
+/**
+ * Main pulling loop of program.
+ */
+int main()
+{
+	// Clears potentially uncleared memory.
+	initialize_system();
+	frame_counter_previous = *slv_reg1;
+	// Program will run until exit command is given.
+	while(exit_flag == false)
+	{
+		// Only accepts frame input when the End Of Frame pulse has been
+		// detected.
+		if(frame_counter_previous != *slv_reg1)
+		{
+			// Checks register values of certain buttons & switches.
+			// Sets modes appropriately.
+			check_inputs();
+			// Controls how the PPM_Output is generated.
+			relay_mode_handler();
+		}
+		// Assigns new previous values.
+		frame_counter_previous = *slv_reg1;
+		// No buttons were pressed during the last cycle.
+	}
+	// From platform.c : Disables cache.
+	cleanup_platform();
+	// Exit command has been given.
+	return 0;
+}
+
+
+/**
+ * Initializes various components of the system. Uart, memory, caches, etc..
+ */
+void initialize_system()
+{
+	// From platform.c : Setups up cache and uart.
+	//init_platform();
+	enable_caches();
+	// Setup UART
+	uart_config_ptr = XUartPs_LookupConfig(XPAR_XUARTPS_0_DEVICE_ID);
+	XUartPs_CfgInitialize(&uart_ps, uart_config_ptr, uart_config_ptr->BaseAddress);
+}
+
+/**
+ * Checks the register values for any active
+ * button or switch gpio lines.
+ */
+void check_inputs()
+{
+    /************ SWITCH 0 ************/
+
+	// Checks SWITCH 0's register value.
+	// If True -> Software Relay Mode
+	// If False -> Hardware Relay Mode
+	if(*sw_ptr & SW_0)
+	{
+		// Register value 0 detected.
+		// Switching to Software Relay Mode.
+		relay_mode = RELAY_SOFTWARE;
+	}
+	else
+	{
+		// Register value 1 detected.
+		// Switching to Hardware Relay Mode.
+		relay_mode = RELAY_HARDWARE;
+	}
+
+	/************ SWITCH 1 ************/
+
+	// Checks for valid SWITCH 1.
+	if(*sw_ptr & SW_1)
+	{
+		//xil_printf("Center button pressed. #: %d\r\n", counter++);
+		// Center button press detected.
+		debug_flag = true;
+	}
+
+	/************ SWITCH 2 ************/
+
+	// Checks for valid SWITCH 2.
+    if(*sw_ptr & SW_2)
+    {
+    	// Register value 1 detected.
+    	// Switching to Software Filter Mode.
+    	//filter_mode = FILTER;
+    	pid_flag = true;
+	}
+//	else
+//	{
+//		// Register value 0 detected.
+//		// Switching out of Software Filter Mode.
+//		filter_mode = FILTER_NONE;
+//	}
+    // Checks for valid SWITCH 7.
+	if(*sw_ptr & SW_7)
+	{
+		// Register value 1 detected.
+		// Switching to Software Filter Mode.
+		exit_flag = true;
+	}
+}
+
+
+/**
+ * Controls how the PPM_Output is generated.
+ * Either by routing the PPM_Input directly
+ * to the PPM_Output or by copying over the PPM
+ * frames into temporary registers and allowing
+ * the FSM to generate the output.
+ */
+void relay_mode_handler()
+{
+	// HARDWARE Relay Mode active.
+	if(relay_mode == RELAY_HARDWARE)
+	{
+		// Set config register 0 to tell axi_ppm that hardware relay mode
+		// has been enabled. PPM_Input routes directly to PPM_Output.
+		*slv_reg0 = 0;
+	}
+	// SOFTWARE Relay Mode active.
+	else if(relay_mode == RELAY_SOFTWARE)
+	{
+		// Signals the coping of PPM frames from slave registers 2 -> 7
+		// into slave registers 8 -> 13. 8 thru 13 registers are
+		// then read by axi_ppm module to generate output.
+		// ONLY COPY WHEN NOT IN REPLAY MODE, OTHERWISE HOLD PREV.VALUES
+//			if(filter_mode == FILTER)
+//			{
+//				yaw_gps = request_gps(debug_flag);
+//				// Verifies all values being sent to the drone.
+//				filter_mode_handler(*slv_reg2,
+//									*slv_reg3,
+//									*slv_reg4,
+//									*slv_reg5,
+//									*slv_reg6,
+//									*slv_reg7);
+//
+//			}
+//			else
+//			{
+		if(pid_flag) {
+			yaw_gps = request_gps(debug_flag);
+			pid yaw_pid;
+			yaw_pid.sensor = yaw_gps;	// input
+			yaw_pid.KP = 10000;
+			yaw_pid.KI = 0;
+			yaw_pid.KD = 0;
+			yaw_pid.setpoint = 0;
+			compute_pid(&yaw_pid);
+			// Channel 4
+			*slv_reg11 = *slv_reg5 + yaw_pid.pid_correction;	// output
+			pid_flag = false;
+		}
+		else {
+			*slv_reg11 = *slv_reg5;
+		}
+		// Channel 1
+		*slv_reg8 = *slv_reg2;
+		// Channel 2
+		*slv_reg9 = *slv_reg3;
+		// Channel 3
+		*slv_reg10 = *slv_reg4;
+		// Channel 5
+		*slv_reg12 = *slv_reg6;
+		// Channel 6
+		*slv_reg13 = *slv_reg7;
+//			}
+		// Set config register 1 to tell axi_ppm that software relay mode
+		// has been enabled. PPM_Output is generated from the copied values.
+		*slv_reg0 = 1;
+	}
+}
+
+
+/**
+ * All values to be sent to the drone will be verified
+ * to ensure they will not put the craft in an unstable
+ * position.
+ */
+void filter_mode_handler(uint32_t ch1, uint32_t ch2, uint32_t ch3, uint32_t ch4, uint32_t ch5, uint32_t ch6)
+{
+	// Software Filter Mode active.
+	if(filter_mode == FILTER)
+	{
+		// Ensures channel width value is within its min and max values.
+		channel_boundary_correction(ch1, ch2, ch3, ch4, ch5, ch6);
+	}
+}
+
+
+/**
+ * Ensures each channel's width are within its specified min and max values.
+ */
+void channel_boundary_correction(uint32_t ch1, uint32_t ch2, uint32_t ch3, uint32_t ch4, uint32_t ch5, uint32_t ch6)
+{
+	//xil_printf("Before Filter\r\n");
+	//xil_printf("Ch 1: %6d    Ch 2: %6d    Ch 3: %6d    Ch 4: %6d    Ch 5: %6d    Ch 6: %6d \r\n", ch1, ch2, ch3, ch4, ch5, ch6);
+
+	// Checks for out-of-bounds Channel 4 width.
+	// Adjusts to nearest acceptable boundary if beyond limit.
+	// YAW CHANNEL
+	// Setup pid
+
+//	pid yaw_pid;
+//	yaw_pid.sensor = yaw_gps;	// input
+//	yaw_pid.KP = 100;
+//	yaw_pid.KI = 0;
+//	yaw_pid.KD = 0;
+//	yaw_pid.setpoint = 0;
+//	compute_pid(&yaw_pid);
+//	ch4 += yaw_pid.pid_correction;	// output
+
+	/************ CHANNEL 1 ************/
+
+	// Checks for out-of-bounds Channel 1 width.
+	// Adjusts to nearest acceptable boundary if beyond limit.
+	if(ch1 < CHANNEL_1_MIN)
+	{
+		ch1 = CHANNEL_1_MIN;
+	}
+	else if(ch1 > CHANNEL_1_MAX)
+	{
+		ch1 = CHANNEL_1_MAX;
+	}
+	*slv_reg8 = ch1;
+
+	/************ CHANNEL 2 ************/
+
+	// Checks for out-of-bounds Channel 2 width.
+	// Adjusts to nearest acceptable boundary if beyond limit
+	if(ch2 < CHANNEL_2_MIN)
+	{
+		ch2 = CHANNEL_2_MIN;
+	}
+	else if(ch2 > CHANNEL_2_MAX)
+	{
+		ch2 = CHANNEL_2_MAX;
+	}
+	*slv_reg9 = ch2;
+
+	/************ CHANNEL 3 ************/
+
+	// Checks for out-of-bounds Channel 3 width.
+	// Adjusts to nearest acceptable boundary if beyond limit.
+	if(ch3 < CHANNEL_3_MIN)
+	{
+		ch3 = CHANNEL_3_MIN;
+	}
+	else if(ch3 > CHANNEL_3_MAX)
+	{
+		ch3 = CHANNEL_3_MAX;
+	}
+	*slv_reg10 = ch3;
+
+	/************ CHANNEL 4 ************/
+
+	if(ch4 < CHANNEL_4_MIN)
+	{
+		ch4 = CHANNEL_4_MIN;
+	}
+	else if(ch4 > CHANNEL_4_MAX)
+	{
+		ch4 = CHANNEL_4_MAX;
+	}
+	*slv_reg11 = ch4;
+
+
+
+	/************ CHANNEL 5 ************/
+
+	// Checks for out-of-bounds Channel 5 width.
+	// Adjusts to nearest acceptable boundary if beyond limit.
+	if(ch5 < CHANNEL_5_MIN)
+	{
+		ch5 = CHANNEL_5_MIN;
+	}
+	else if(ch5 > CHANNEL_5_MAX)
+	{
+		ch5 = CHANNEL_5_MAX;
+	}
+	*slv_reg12 = ch5;
+
+	/************ CHANNEL 6 ************/
+
+	// Checks for out-of-bounds Channel 6 width.
+	// Adjusts to nearest acceptable boundary if beyond limit.
+	if(ch6 < CHANNEL_6_MIN)
+	{
+		ch6 = CHANNEL_6_MIN;
+	}
+	else if(ch6 > CHANNEL_6_MAX)
+	{
+		ch6 = CHANNEL_6_MAX;
+	}
+	*slv_reg13 = ch6;
+
+	//xil_printf("After Filter\r\n");
+	//xil_printf("Ch 1: %6d    Ch 2: %6d    Ch 3: %6d    Ch 4: %6d    Ch 5: %6d    Ch 6: %6d \r\n", *slv_reg8, *slv_reg9, *slv_reg10, *slv_reg11, *slv_reg12, *slv_reg13);
+
+}
+
+void compute_pid(pid *myPID) {
+	int error = myPID->setpoint - myPID->sensor;
+	myPID->pid_correction = (error) * myPID->KP;
+	myPID->pid_correction += (error - myPID->prev_error)* myPID->KD;
+	myPID->pid_correction += (myPID->acc_error) * myPID->KI;
+	myPID->prev_error = error; // clear acc_error when turning on auto pilot
+	myPID->acc_error += error;// running total of error, should go to 0
+}
+
+float request_gps(bool debug) {
+	float x,y,z,yaw;
+	get_ZED_buf[1001] = 0;  // Make sure buffer is NULL terminated
+	get_ZED_buf[0] = 'S';
+	int count = 0;
+	while(count < 1){
+		count += XUartPs_Send(&uart_ps, get_ZED_buf, 1);
+	}
+
+	memset(get_ZED_buf,0,1001);
+	count = XUartPs_Recv(&uart_ps, get_ZED_buf, 1);
+	if (get_ZED_buf[0] == 'A') {
+		count = 0;
+	}
+	while(count < 16){
+		count += XUartPs_Recv(&uart_ps, get_ZED_buf+count, 16-count);
+	}
+	x = *( (float*) (&get_ZED_buf[0] ) );
+	y = *( (float*) (&get_ZED_buf[4] ) );
+	z = *( (float*) (&get_ZED_buf[8] ) );
+	yaw = *( (float*) (&get_ZED_buf[12] ) );
+	if(debug) {
+		get_ZED_buf[0] = 'D';
+		XUartPs_Send(&uart_ps, get_ZED_buf, 1);
+		sprintf((char*)get_ZED_buf,"pie X =%4.2f, Y=%4.2f, Z=%4.2f, Yaw=%4.2f",x,y,z,yaw);
+		count = 0;
+		while(count < 1000) {
+			count += XUartPs_Send(&uart_ps, get_ZED_buf+count, 1000-count);
+		}
+		count = 0;
+		while (count < 16) {
+			count += XUartPs_Recv(&uart_ps, get_ZED_buf + count, 16 - count);
+		}
+	}
+	debug_flag = false;
+	return yaw;
+}
